@@ -22,3 +22,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Spec de OpenAPI: se genera con `php artisan scramble:export`
+/api.json

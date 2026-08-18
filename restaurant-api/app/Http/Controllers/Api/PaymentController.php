@@ -51,7 +51,9 @@ class PaymentController extends Controller
 
         $data = $request->validate([
             'order_id'  => ['required', 'integer'],
-            'method'    => ['required', 'in:' . implode(',', self::METODOS)],
+            // Literal en vez de implode(self::METODOS): así el generador de
+            // documentación puede leer los valores admitidos.
+            'method'    => ['required', 'in:cash,card,nequi,daviplata,bancolombia,transfer,other'],
             'amount'    => ['required', 'numeric', 'min:0'],
             'reference' => ['nullable', 'string', 'max:100'],
             'notes'     => ['nullable', 'string', 'max:255'],

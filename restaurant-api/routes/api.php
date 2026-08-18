@@ -24,19 +24,22 @@ use App\Http\Controllers\Api\WhatsappController;
 
 // ── Rutas públicas ──────────────────────────────────────────────────────────
 
-Route::post('/auth/login', [AuthController::class, 'login']);
+// Límite estricto: el login es el blanco natural de un ataque de fuerza bruta.
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 // Broadcasting auth — requiere Sanctum pero va fuera del grupo para mayor compatibilidad
 Route::post('/broadcasting/auth', [BroadcastController::class, 'auth'])
     ->middleware('auth:sanctum');
 
 // Menú público — cliente escanea QR, no necesita token
-Route::get('/menu/{restaurantSlug}', [MenuController::class, 'public']);
-Route::post('/orders/qr', [OrderController::class, 'storeFromQr']);
+Route::get('/menu/{restaurantSlug}', [MenuController::class, 'public'])->middleware('throttle:60,1');
+
+// Crear pedidos sin autenticar necesita freno: es la ruta más abusable.
+Route::post('/orders/qr', [OrderController::class, 'storeFromQr'])->middleware('throttle:10,1');
 
 // WhatsApp webhook — Meta verifica con GET, envía mensajes con POST
 Route::get('/webhook/whatsapp',  [WhatsappController::class, 'verify']);
-Route::post('/webhook/whatsapp', [WhatsappController::class, 'webhook']);
+Route::post('/webhook/whatsapp', [WhatsappController::class, 'webhook'])->middleware('throttle:300,1');
 
 // ── Rutas protegidas ─────────────────────────────────────────────────────────
 

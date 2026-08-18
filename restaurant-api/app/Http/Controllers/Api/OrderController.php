@@ -2,15 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Events\OrderCreated;
 use App\Events\OrderStatusUpdated;
-use App\Events\TableStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
-use App\Models\Additional;
 use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\OrderItemAdditional;
 use App\Models\Product;
 use App\Models\Restaurant;
 use App\Models\RestaurantTable;
@@ -18,10 +13,15 @@ use App\Services\OrderService;
 use App\Services\PlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 
 class OrderController extends Controller
 {
+    public function __construct(
+        private readonly OrderService $orders,
+        private readonly PlanService $plans,
+    ) {}
+
     // Transiciones de estado válidas
     private const TRANSITIONS = [
         'pending'    => ['preparing', 'cancelled'],
@@ -69,124 +69,38 @@ class OrderController extends Controller
         return response()->json(OrderResource::collection($orders)->response()->getData(true));
     }
 
+    /**
+     * Crear un pedido desde el panel del restaurante.
+     */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'type'                         => ['required', 'in:dine_in,delivery,counter'],
-            'table_id'                     => ['nullable', 'integer'],
-            'customer_id'                  => ['nullable', 'integer'],
-            'delivery_address'             => ['nullable', 'string'],
-            'delivery_notes'               => ['nullable', 'string'],
-            'notes'                        => ['nullable', 'string'],
-            'items'                        => ['required', 'array', 'min:1'],
-            'items.*.product_id'           => ['required', 'integer'],
-            'items.*.quantity'             => ['required', 'integer', 'min:1'],
-            'items.*.notes'                => ['nullable', 'string'],
-            'items.*.additionals'          => ['nullable', 'array'],
-            'items.*.additionals.*'        => ['integer'],
+            'type'                  => ['required', 'in:dine_in,delivery,counter'],
+            'table_id'              => ['nullable', 'integer'],
+            'customer_id'           => ['nullable', 'integer'],
+            'delivery_address'      => ['nullable', 'string'],
+            'delivery_notes'        => ['nullable', 'string'],
+            'notes'                 => ['nullable', 'string'],
+            'items'                 => ['required', 'array', 'min:1'],
+            'items.*.product_id'    => ['required', 'integer'],
+            'items.*.quantity'      => ['required', 'integer', 'min:1'],
+            'items.*.notes'         => ['nullable', 'string'],
+            'items.*.additionals'   => ['nullable', 'array'],
+            'items.*.additionals.*' => ['integer'],
         ]);
 
-        $restaurantId = $request->input('restaurant_id');
+        $restaurantId = (int) $request->input('restaurant_id');
 
-        // El cupo diario se cuenta sobre el día local del restaurante.
-        app(PlanService::class)->assertRoomFor(
-            Restaurant::findOrFail($restaurantId),
-            'daily_orders'
+        if ($error = $this->validarPedido($data, $restaurantId)) {
+            return $error;
+        }
+
+        $order = $this->orders->create(
+            $data,
+            $restaurantId,
+            $request->user()?->id,
+            $this->productosDelRestaurante($data, $restaurantId),
         );
-
-        if ($data['type'] === 'dine_in' && empty($data['table_id'])) {
-            return response()->json(['message' => 'table_id es requerido para pedidos en mesa.'], 422);
-        }
-
-        // Verificar que todos los productos pertenecen al restaurante
-        $productIds = collect($data['items'])->pluck('product_id')->unique();
-        $products   = Product::where('restaurant_id', $restaurantId)
-            ->whereIn('id', $productIds)
-            ->get()
-            ->keyBy('id');
-
-        if ($products->count() !== $productIds->count()) {
-            return response()->json(['message' => 'Uno o más productos no pertenecen a este restaurante.'], 422);
-        }
-
-        $order = DB::transaction(function () use ($data, $restaurantId, $products, $request) {
-            $subtotal = 0;
-
-            $order = Order::create([
-                'restaurant_id'    => $restaurantId,
-                'table_id'         => $data['table_id'] ?? null,
-                'customer_id'      => $data['customer_id'] ?? null,
-                // Null en pedidos por QR: la ruta pública no tiene usuario autenticado.
-                'user_id'          => $request->user()?->id,
-                'type'             => $data['type'],
-                'status'           => 'pending',
-                'delivery_address' => $data['delivery_address'] ?? null,
-                'delivery_notes'   => $data['delivery_notes'] ?? null,
-                'notes'            => $data['notes'] ?? null,
-                'subtotal'         => 0,
-                'tax_amount'       => 0,
-                'discount_amount'  => 0,
-                'total'            => 0,
-            ]);
-
-            foreach ($data['items'] as $itemData) {
-                $product   = $products[$itemData['product_id']];
-                $unitPrice = (float) $product->price;
-
-                // Calcular precio de adicionales
-                $additionalIds    = $itemData['additionals'] ?? [];
-                $extraPrice       = 0;
-                $additionalModels = [];
-
-                if (!empty($additionalIds)) {
-                    $additionalModels = Additional::whereIn('id', $additionalIds)->get()->keyBy('id');
-                    foreach ($additionalModels as $add) {
-                        $extraPrice += (float) $add->extra_price;
-                    }
-                }
-
-                $itemSubtotal = ($unitPrice + $extraPrice) * $itemData['quantity'];
-                $subtotal    += $itemSubtotal;
-
-                $item = OrderItem::create([
-                    'order_id'     => $order->id,
-                    'product_id'   => $product->id,
-                    'product_name' => $product->name,
-                    'unit_price'   => $unitPrice + $extraPrice,
-                    'quantity'     => $itemData['quantity'],
-                    'subtotal'     => $itemSubtotal,
-                    'notes'        => $itemData['notes'] ?? null,
-                    'status'       => 'pending',
-                ]);
-
-                foreach ($additionalModels as $add) {
-                    OrderItemAdditional::create([
-                        'order_item_id'   => $item->id,
-                        'additional_id'   => $add->id,
-                        'additional_name' => $add->name,
-                        'extra_price'     => $add->extra_price,
-                    ]);
-                }
-            }
-
-            $order->update([
-                'subtotal' => $subtotal,
-                'total'    => $subtotal,
-            ]);
-
-            // Marcar mesa como ocupada
-            if ($data['type'] === 'dine_in' && !empty($data['table_id'])) {
-                RestaurantTable::where('id', $data['table_id'])
-                    ->where('restaurant_id', $restaurantId)
-                    ->update(['status' => 'occupied']);
-            }
-
-            return $order;
-        });
-
-        $order->load(['items.additionals', 'table', 'customer', 'user']);
-
-        event(new OrderCreated($order));
 
         return response()->json(new OrderResource($order), 201);
     }
@@ -263,38 +177,85 @@ class OrderController extends Controller
         return response()->json(new OrderResource($order));
     }
 
+    /**
+     * Crear un pedido desde el QR de la mesa, sin sesión.
+     *
+     * Ruta pública: el restaurante se resuelve por el slug y el pedido queda sin
+     * usuario asociado.
+     */
     public function storeFromQr(Request $request): JsonResponse
     {
-        // El pedido QR no tiene usuario autenticado; se resuelve por restaurantSlug
         $data = $request->validate([
-            'restaurant_slug' => ['required', 'string'],
-            'table_id'        => ['required', 'integer'],
-            'items'           => ['required', 'array', 'min:1'],
-            'items.*.product_id'  => ['required', 'integer'],
-            'items.*.quantity'    => ['required', 'integer', 'min:1'],
-            'items.*.notes'       => ['nullable', 'string'],
-            'items.*.additionals' => ['nullable', 'array'],
+            'restaurant_slug'       => ['required', 'string'],
+            'table_id'              => ['required', 'integer'],
+            'notes'                 => ['nullable', 'string'],
+            'items'                 => ['required', 'array', 'min:1'],
+            'items.*.product_id'    => ['required', 'integer'],
+            'items.*.quantity'      => ['required', 'integer', 'min:1'],
+            'items.*.notes'         => ['nullable', 'string'],
+            'items.*.additionals'   => ['nullable', 'array'],
+            'items.*.additionals.*' => ['integer'],
         ]);
 
-        $restaurant = \App\Models\Restaurant::where('slug', $data['restaurant_slug'])
+        $restaurant = Restaurant::where('slug', $data['restaurant_slug'])
             ->where('is_active', true)
             ->firstOrFail();
 
         // La mesa llega del cliente: verificar que pertenece a este restaurante.
-        $tableBelongs = RestaurantTable::where('id', $data['table_id'])
+        $mesaPropia = RestaurantTable::where('id', $data['table_id'])
             ->where('restaurant_id', $restaurant->id)
             ->exists();
 
-        if (!$tableBelongs) {
+        if (!$mesaPropia) {
             return response()->json(['message' => 'La mesa no pertenece a este restaurante.'], 422);
         }
 
-        $request->merge([
-            'restaurant_id' => $restaurant->id,
-            'type'          => 'dine_in',
-        ]);
+        $data['type'] = 'dine_in';
 
-        return $this->store($request);
+        if ($error = $this->validarPedido($data, $restaurant->id)) {
+            return $error;
+        }
+
+        $order = $this->orders->create(
+            $data,
+            $restaurant->id,
+            null,
+            $this->productosDelRestaurante($data, $restaurant->id),
+        );
+
+        return response()->json(new OrderResource($order), 201);
+    }
+
+    /**
+     * Reglas comunes a las dos formas de crear un pedido.
+     */
+    private function validarPedido(array $data, int $restaurantId): ?JsonResponse
+    {
+        $this->plans->assertRoomFor(Restaurant::findOrFail($restaurantId), 'daily_orders');
+
+        if ($data['type'] === 'dine_in' && empty($data['table_id'])) {
+            return response()->json(['message' => 'table_id es requerido para pedidos en mesa.'], 422);
+        }
+
+        $productIds = collect($data['items'])->pluck('product_id')->unique();
+
+        $existentes = Product::where('restaurant_id', $restaurantId)
+            ->whereIn('id', $productIds)
+            ->count();
+
+        if ($existentes !== $productIds->count()) {
+            return response()->json(['message' => 'Uno o más productos no pertenecen a este restaurante.'], 422);
+        }
+
+        return null;
+    }
+
+    private function productosDelRestaurante(array $data, int $restaurantId): Collection
+    {
+        return Product::where('restaurant_id', $restaurantId)
+            ->whereIn('id', collect($data['items'])->pluck('product_id')->unique())
+            ->get()
+            ->keyBy('id');
     }
 
     private function authorizeRestaurant(Request $request, Order $order): void
