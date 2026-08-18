@@ -78,6 +78,12 @@ No hay Global Scopes ni Policies; la verificación es manual en cada método.
 
 ## Autenticación
 
+**Alta de un restaurante.** `POST /api/auth/register` es la puerta de entrada al
+servicio: crea el restaurante, su primer usuario admin y los ajustes iniciales en
+una transacción, y devuelve un token para entrar sin iniciar sesión aparte. Plan
+`free` por defecto; el slug se deriva del nombre y admite sufijo si está ocupado.
+Ruta pública, 3 altas por hora.
+
 - `POST /api/auth/login` acepta `email` + `password`, y opcionalmente `restaurant_id` o
   `restaurant_slug` (el email es único **por restaurante**, no global: `unique(email, restaurant_id)`).
 - Devuelve `{ user, token, restaurant: { ..., plan: { has_whatsapp, has_inventory, has_reports, has_financials } } }`.
@@ -85,6 +91,11 @@ No hay Global Scopes ni Policies; la verificación es manual en cada método.
 - Rechaza usuarios con `is_active = false` (403) y actualiza `last_login_at`.
 - `GET /api/auth/me`, `POST /api/auth/logout` (borra el token actual, 204).
 - Roles: enum en `users.role` → `admin | waiter | kitchen | cashier`.
+
+**Un correo puede administrar varios restaurantes**, porque el email es único por
+restaurante y no globalmente. Cuando eso ocurre, el login devuelve **409** con la
+lista de restaurantes a los que pertenece —solo tras verificar la contraseña, así
+que no filtra nada— y el cliente repite la petición con `restaurant_slug`.
 
 **Autorización por rol.** El middleware `role` es propio
 (`app/Http/Middleware/EnsureUserRole.php`) y resuelve contra la columna `users.role`:

@@ -24,6 +24,9 @@ use App\Http\Controllers\Api\WhatsappController;
 
 // ── Rutas públicas ──────────────────────────────────────────────────────────
 
+// Alta de un restaurante nuevo. Límite por hora: crea datos sin autenticar.
+Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:3,60');
+
 // Límite estricto: el login es el blanco natural de un ataque de fuerza bruta.
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
