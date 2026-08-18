@@ -1,0 +1,7 @@
+# Ajustes locales de la máquina, no del proyecto
+.claude/settings.local.json
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
