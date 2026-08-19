@@ -59,7 +59,7 @@ export default function Reportes() {
           <button
             key={p.valor}
             onClick={() => setPreset(p.valor)}
-            className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition ${
+            className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold transition ${
               preset === p.valor
                 ? 'bg-piedra-900 text-white'
                 : 'bg-white text-piedra-600 ring-1 ring-piedra-200 hover:ring-piedra-300'

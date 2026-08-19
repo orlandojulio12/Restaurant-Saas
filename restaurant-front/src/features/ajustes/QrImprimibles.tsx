@@ -92,7 +92,7 @@ export default function QrImprimibles() {
         <div className="mx-auto max-w-4xl p-4 lg:p-6">
           <button
             onClick={() => navegar('/ajustes')}
-            className="mb-3 text-sm font-medium text-piedra-500 hover:text-piedra-800"
+            className="mb-3 min-h-11 -my-3 text-sm font-medium text-piedra-500 hover:text-piedra-800"
           >
             ← Volver a ajustes
           </button>
@@ -141,13 +141,13 @@ export default function QrImprimibles() {
                   <span className="text-sm font-medium text-piedra-700">Mesas</span>
                   <button
                     onClick={() => setSeleccion(new Set(mesas.map((m) => m.id)))}
-                    className="text-sm font-semibold text-marca-700 underline underline-offset-4"
+                    className="min-h-11 -my-3 text-sm font-semibold text-marca-700 underline underline-offset-4"
                   >
                     Todas
                   </button>
                   <button
                     onClick={() => setSeleccion(new Set())}
-                    className="text-sm font-semibold text-piedra-500 underline underline-offset-4"
+                    className="min-h-11 -my-3 text-sm font-semibold text-piedra-500 underline underline-offset-4"
                   >
                     Ninguna
                   </button>
@@ -159,7 +159,7 @@ export default function QrImprimibles() {
                       key={mesa.id}
                       onClick={() => alternar(mesa.id)}
                       aria-pressed={elegidas.has(mesa.id)}
-                      className={`min-h-10 min-w-12 rounded-lg px-3 text-sm font-semibold transition ${
+                      className={`min-h-11 min-w-12 rounded-lg px-3 text-sm font-semibold transition ${
                         elegidas.has(mesa.id)
                           ? 'bg-piedra-900 text-white'
                           : 'bg-white text-piedra-500 ring-1 ring-piedra-200'

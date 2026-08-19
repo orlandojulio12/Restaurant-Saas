@@ -105,7 +105,7 @@ export default function PanelUsuarios() {
                 <div className="flex shrink-0 gap-1">
                   <button
                     onClick={() => setEditando(u)}
-                    className="rounded-lg px-3 py-2 text-sm font-medium text-piedra-600
+                    className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-600
                                hover:bg-piedra-100"
                   >
                     Editar
@@ -117,7 +117,7 @@ export default function PanelUsuarios() {
                     <>
                       <button
                         onClick={() => alternarActivo.mutate(u)}
-                        className="rounded-lg px-3 py-2 text-sm font-medium text-piedra-600
+                        className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-600
                                    hover:bg-piedra-100"
                       >
                         {u.is_active ? 'Desactivar' : 'Activar'}
@@ -127,7 +127,7 @@ export default function PanelUsuarios() {
                           if (confirm(`¿Eliminar a ${u.name}?`)) borrar.mutate(u.id)
                         }}
                         aria-label={`Eliminar a ${u.name}`}
-                        className="rounded-lg px-3 py-2 text-sm font-medium text-piedra-400
+                        className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
                                    hover:bg-cancelado-suave hover:text-cancelado"
                       >
                         Eliminar

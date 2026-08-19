@@ -169,7 +169,7 @@ export default function Clientes() {
               <div className="flex shrink-0 gap-1">
                 <button
                   onClick={() => setEditando(c)}
-                  className="rounded-lg px-3 py-2 text-sm font-medium text-piedra-600
+                  className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-600
                              hover:bg-piedra-100"
                 >
                   Editar
@@ -184,7 +184,7 @@ export default function Clientes() {
                     if (confirm(texto)) borrar.mutate({ id: c.id, forzar: conPedidos })
                   }}
                   aria-label={`Eliminar a ${c.name || 'cliente'}`}
-                  className="rounded-lg px-3 py-2 text-sm font-medium text-piedra-400
+                  className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
                              hover:bg-cancelado-suave hover:text-cancelado"
                 >
                   Eliminar

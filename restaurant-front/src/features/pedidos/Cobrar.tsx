@@ -137,7 +137,7 @@ export default function Cobrar() {
     <div className="mx-auto max-w-md p-4 lg:p-6">
       <button
         onClick={() => navegar(-1)}
-        className="mb-4 text-sm font-medium text-piedra-500 hover:text-piedra-800"
+        className="mb-2 min-h-11 text-sm font-medium text-piedra-500 hover:text-piedra-800"
       >
         ← Volver
       </button>

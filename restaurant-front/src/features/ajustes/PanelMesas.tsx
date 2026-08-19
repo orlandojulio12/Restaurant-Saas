@@ -98,7 +98,7 @@ export default function PanelMesas() {
                   <button
                     onClick={() => setEditandoMesa(mesa)}
                     aria-label={`Editar mesa ${mesa.number}`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg
+                    className="flex h-11 w-11 items-center justify-center rounded-lg
                                text-piedra-500 hover:bg-piedra-100"
                   >
                     ✎
@@ -108,7 +108,7 @@ export default function PanelMesas() {
                       if (confirm(`¿Eliminar la mesa ${mesa.number}?`)) borrarMesa.mutate(mesa.id)
                     }}
                     aria-label={`Eliminar mesa ${mesa.number}`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg
+                    className="flex h-11 w-11 items-center justify-center rounded-lg
                                text-piedra-400 hover:bg-cancelado-suave hover:text-cancelado"
                   >
                     ✕
@@ -155,7 +155,7 @@ export default function PanelMesas() {
                   <button
                     onClick={() => setEditandoZona(zona)}
                     aria-label={`Editar zona ${zona.name}`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg
+                    className="flex h-11 w-11 items-center justify-center rounded-lg
                                text-piedra-500 hover:bg-piedra-100"
                   >
                     ✎
@@ -172,7 +172,7 @@ export default function PanelMesas() {
                       if (confirm(texto)) borrarZona.mutate({ id: zona.id, forzar: conMesas })
                     }}
                     aria-label={`Eliminar zona ${zona.name}`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg
+                    className="flex h-11 w-11 items-center justify-center rounded-lg
                                text-piedra-400 hover:bg-cancelado-suave hover:text-cancelado"
                   >
                     ✕

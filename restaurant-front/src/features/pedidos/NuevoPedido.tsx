@@ -413,7 +413,7 @@ function Pestana({
   return (
     <button
       onClick={onClick}
-      className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition ${
+      className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold transition ${
         activa ? 'bg-piedra-900 text-white' : 'bg-piedra-100 text-piedra-600 hover:bg-piedra-200'
       }`}
     >

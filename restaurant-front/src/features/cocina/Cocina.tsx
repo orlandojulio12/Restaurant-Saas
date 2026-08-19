@@ -17,10 +17,17 @@ import { useAvisoSonoro, useCanalCocina } from './useCanalCocina'
  * por tarjeta. La antigüedad tiñe la tarjeta entera antes de que nadie lea.
  */
 
-const COLUMNAS: { estado: EstadoPedido; titulo: string; siguiente: EstadoPedido; accion: string }[] = [
-  { estado: 'pending', titulo: 'Por preparar', siguiente: 'preparing', accion: 'Empezar' },
-  { estado: 'preparing', titulo: 'En preparación', siguiente: 'ready', accion: 'Listo' },
-  { estado: 'ready', titulo: 'Listos para servir', siguiente: 'delivered', accion: 'Entregado' },
+const COLUMNAS: {
+  estado: EstadoPedido
+  titulo: string
+  /** En las pestañas de móvil no cabe el título largo. */
+  corto: string
+  siguiente: EstadoPedido
+  accion: string
+}[] = [
+  { estado: 'pending', titulo: 'Por preparar', corto: 'Por preparar', siguiente: 'preparing', accion: 'Empezar' },
+  { estado: 'preparing', titulo: 'En preparación', corto: 'Preparando', siguiente: 'ready', accion: 'Listo' },
+  { estado: 'ready', titulo: 'Listos para servir', corto: 'Listos', siguiente: 'delivered', accion: 'Entregado' },
 ]
 
 export default function Cocina() {
@@ -29,6 +36,7 @@ export default function Cocina() {
   const clienteQuery = useQueryClient()
   const sonar = useAvisoSonoro()
   const [silencio, setSilencio] = useState(false)
+  const [columnaMovil, setColumnaMovil] = useState<EstadoPedido>('pending')
 
   const conexion = useCanalCocina(sesion?.restaurante.id, () => {
     if (!silencio) sonar()
@@ -57,50 +65,87 @@ export default function Cocina() {
 
   const pedidos = data?.data ?? []
 
+  const porColumna = (estado: EstadoPedido) =>
+    pedidos
+      .filter((p) => p.status === estado)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
   return (
-    <div className="min-h-dvh bg-piedra-950 text-white">
-      <header className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-3">
+    /*
+      Altura real con flex en vez de calcular 100dvh menos una cabecera que se
+      daba por fija: en pantallas estrechas la cabecera envuelve y crecía, así
+      que las columnas se pasaban de largo.
+    */
+    <div className="flex h-dvh flex-col overflow-hidden bg-piedra-950 text-white">
+      <header
+        className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2
+                   border-b border-white/10 px-4 py-3 sm:px-5"
+      >
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold">Cocina</h1>
           <Conexion estado={conexion} />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => setSilencio((s) => !s)}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-white/60 hover:bg-white/10"
+            className="min-h-11 rounded-lg px-3 text-sm font-medium text-white/60 hover:bg-white/10"
             aria-pressed={silencio}
           >
             {silencio ? '🔇 Silencio' : '🔔 Aviso'}
           </button>
           <button
             onClick={() => navegar('/mesas')}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-white/60 hover:bg-white/10"
+            className="min-h-11 rounded-lg px-3 text-sm font-medium text-white/60 hover:bg-white/10"
           >
             Salir
           </button>
         </div>
       </header>
 
+      {/* En pantalla estrecha las tres columnas apiladas obligaban a recorrer
+          tres pantallas completas para ver el tablero. Se muestra una a la vez
+          y se cambia con estas pestañas, que además llevan el conteo. */}
+      <div className="flex shrink-0 gap-px border-b border-white/10 bg-white/10 md:hidden">
+        {COLUMNAS.map((columna) => {
+          const cuantos = porColumna(columna.estado).length
+
+          return (
+            <button
+              key={columna.estado}
+              onClick={() => setColumnaMovil(columna.estado)}
+              className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5
+                          px-1 text-xs font-bold ${
+                            columnaMovil === columna.estado
+                              ? 'bg-piedra-900 text-white'
+                              : 'bg-piedra-950 text-white/45'
+                          }`}
+            >
+              <span className="cifras text-lg leading-none">{cuantos}</span>
+              {columna.corto}
+            </button>
+          )
+        })}
+      </div>
+
       {isLoading ? (
         <p className="p-8 text-white/40">Cargando pedidos…</p>
       ) : (
-        <div className="grid grid-cols-1 gap-px bg-white/10 md:grid-cols-3">
+        <div className="flex min-h-0 flex-1 gap-px bg-white/10">
           {COLUMNAS.map((columna) => {
-            const suyos = pedidos
-              .filter((p) => p.status === columna.estado)
-              .sort(
-                (a, b) =>
-                  new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-              )
+            const suyos = porColumna(columna.estado)
 
             return (
               <section
                 key={columna.estado}
-                className="min-h-[calc(100dvh-57px)] bg-piedra-950 p-3"
+                /* Cada columna con su propio scroll: en cocina se llena una
+                   sola y no debe arrastrar a las demás. */
+                className={`min-h-0 flex-1 overflow-y-auto bg-piedra-950 p-3 ${
+                  columnaMovil === columna.estado ? 'block' : 'hidden md:block'
+                }`}
               >
-                <h2 className="mb-3 flex items-center justify-between px-1 text-sm font-bold
-                               tracking-wide text-white/50 uppercase">
+                <h2 className="mb-3 hidden items-center justify-between px-1 text-sm font-bold
+                               tracking-wide text-white/50 uppercase md:flex">
                   {columna.titulo}
                   <span className="cifras rounded-full bg-white/10 px-2 py-0.5 text-white/70">
                     {suyos.length}

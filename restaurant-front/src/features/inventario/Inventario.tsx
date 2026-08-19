@@ -311,7 +311,7 @@ function ListaMovimientos({
             className="flex items-center gap-3 rounded-xl border border-piedra-200 bg-white p-3.5"
           >
             <span
-              className={`shrink-0 rounded-lg px-2 py-1 text-xs font-semibold ${pinta.clase}`}
+              className={`shrink-0 min-h-11 rounded-lg px-3 text-xs font-semibold ${pinta.clase}`}
             >
               {pinta.texto}
             </span>
@@ -376,7 +376,7 @@ function SinReceta({ productos, cargando }: { productos: { id: number; name: str
         </p>
         <button
           onClick={() => setAbierto((v) => !v)}
-          className="text-sm font-semibold text-pendiente underline underline-offset-4"
+          className="py-3 -my-3 text-sm font-semibold text-pendiente underline underline-offset-4"
         >
           {abierto ? 'Ocultar' : 'Ver cuáles'}
         </button>

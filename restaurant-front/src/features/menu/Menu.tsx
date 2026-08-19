@@ -270,13 +270,13 @@ function ListaProductos({
           <div className="flex shrink-0 flex-col gap-1">
             <button
               onClick={() => onEditar(p)}
-              className="rounded-lg px-2 py-1 text-sm font-medium text-marca-700 hover:bg-marca-50"
+              className="min-h-11 rounded-lg px-3 text-sm font-medium text-marca-700 hover:bg-marca-50"
             >
               Editar
             </button>
             <button
               onClick={() => onBorrar(p)}
-              className="rounded-lg px-2 py-1 text-sm font-medium text-piedra-400
+              className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
                          hover:bg-cancelado-suave hover:text-cancelado"
             >
               Eliminar
@@ -337,13 +337,13 @@ function ListaCategorias({
 
           <button
             onClick={() => onEditar(c)}
-            className="rounded-lg px-2 py-1 text-sm font-medium text-marca-700 hover:bg-marca-50"
+            className="min-h-11 rounded-lg px-3 text-sm font-medium text-marca-700 hover:bg-marca-50"
           >
             Editar
           </button>
           <button
             onClick={() => onBorrar(c)}
-            className="rounded-lg px-2 py-1 text-sm font-medium text-piedra-400
+            className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
                        hover:bg-cancelado-suave hover:text-cancelado"
           >
             Eliminar
@@ -396,13 +396,13 @@ function ListaGrupos({
             <div className="flex shrink-0 gap-1">
               <button
                 onClick={() => onEditar(g)}
-                className="rounded-lg px-2 py-1 text-sm font-medium text-marca-700 hover:bg-marca-50"
+                className="min-h-11 rounded-lg px-3 text-sm font-medium text-marca-700 hover:bg-marca-50"
               >
                 Editar
               </button>
               <button
                 onClick={() => onBorrar(g)}
-                className="rounded-lg px-2 py-1 text-sm font-medium text-piedra-400
+                className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
                            hover:bg-cancelado-suave hover:text-cancelado"
               >
                 Eliminar
@@ -414,7 +414,7 @@ function ListaGrupos({
             {g.additionals.map((a) => (
               <li
                 key={a.id}
-                className={`cifras rounded-lg px-2 py-1 text-xs ${
+                className={`cifras min-h-11 rounded-lg px-3 text-xs ${
                   a.is_available
                     ? 'bg-piedra-100 text-piedra-700'
                     : 'bg-piedra-100 text-piedra-400 line-through'

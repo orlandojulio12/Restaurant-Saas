@@ -189,19 +189,24 @@ function Interruptor({
   activo: boolean
   onCambio: (v: boolean) => void
 }) {
+  // La fila entera es el control, no solo el interruptor: encerrado en un
+  // <label>, pulsar el texto no hacía nada y el objetivo real eran 28 px.
   return (
-    <label className="flex min-h-12 cursor-pointer items-center justify-between gap-4">
+    <button
+      type="button"
+      role="switch"
+      aria-checked={activo}
+      onClick={() => onCambio(!activo)}
+      className="flex min-h-13 w-full items-center justify-between gap-4 rounded-xl
+                 px-1 text-left transition hover:bg-piedra-50"
+    >
       <span>
         <span className="text-sm font-medium text-piedra-700">{etiqueta}</span>
         {ayuda && <span className="block text-xs text-piedra-400">{ayuda}</span>}
       </span>
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={activo}
-        aria-label={etiqueta}
-        onClick={() => onCambio(!activo)}
+      <span
+        aria-hidden
         className={`relative h-7 w-12 shrink-0 rounded-full transition ${
           activo ? 'bg-marca-600' : 'bg-piedra-300'
         }`}
@@ -211,7 +216,7 @@ function Interruptor({
             activo ? 'left-6' : 'left-1'
           }`}
         />
-      </button>
-    </label>
+      </span>
+    </button>
   )
 }

@@ -101,7 +101,7 @@ export default function Pedidos() {
               setFiltro(f.valor)
               setPagina(1)
             }}
-            className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition ${
+            className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold transition ${
               filtro === f.valor
                 ? 'bg-piedra-900 text-white'
                 : 'bg-white text-piedra-600 ring-1 ring-piedra-200 hover:ring-piedra-300'
