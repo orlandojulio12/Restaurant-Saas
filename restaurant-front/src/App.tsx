@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import Layout from './components/Layout'
 import Entrar from './features/auth/Entrar'
 import { useSesion } from './features/auth/SesionContext'
+import Cocina from './features/cocina/Cocina'
 import Mesas from './features/mesas/Mesas'
 import NuevoPedido from './features/pedidos/NuevoPedido'
 import PedidoDetalle from './features/pedidos/PedidoDetalle'
@@ -20,7 +21,7 @@ export default function App() {
           <Route path="/pedidos" element={<EnObra titulo="Pedidos" />} />
           <Route path="/pedidos/nuevo" element={<NuevoPedido />} />
           <Route path="/pedidos/:id" element={<PedidoDetalle />} />
-          <Route path="/cocina" element={<EnObra titulo="Cocina" />} />
+          <Route path="/cocina" element={<Cocina />} />
           <Route path="/menu" element={<EnObra titulo="Menú" />} />
           <Route path="/inventario" element={<EnObra titulo="Inventario" />} />
           <Route path="/reportes" element={<EnObra titulo="Reportes" />} />
