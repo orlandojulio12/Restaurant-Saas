@@ -76,13 +76,25 @@ export function interpretarError(error: unknown): FalloApi {
   }
 }
 
+/**
+ * Rutas que se abren sin sesión.
+ *
+ * El menú del QR lo abre un comensal en su móvil: mandarlo al login sería
+ * mandarlo a una pantalla que no le corresponde. Y un token viejo guardado en
+ * ese navegador —de alguien del personal que usó el mismo teléfono— provocaba
+ * justo eso al arrancar la app.
+ */
+const RUTAS_PUBLICAS = ['/entrar', '/registro', '/m/']
+
+function enRutaPublica(): boolean {
+  return RUTAS_PUBLICAS.some((ruta) => window.location.pathname.startsWith(ruta))
+}
+
 // Sesión caducada o revocada: al panel no le sirve seguir intentándolo.
 api.interceptors.response.use(
   (respuesta) => respuesta,
   (error: AxiosError) => {
-    const enLogin = window.location.pathname.startsWith('/entrar')
-
-    if (error.response?.status === 401 && !enLogin) {
+    if (error.response?.status === 401 && !enRutaPublica()) {
       borrarToken()
       window.location.assign('/entrar?expirada=1')
     }

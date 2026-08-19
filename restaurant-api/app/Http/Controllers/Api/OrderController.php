@@ -187,7 +187,11 @@ class OrderController extends Controller
     {
         $data = $request->validate([
             'restaurant_slug'       => ['required', 'string'],
-            'table_id'              => ['required', 'integer'],
+            // El código del QR identifica la mesa sin ser adivinable. table_id
+            // sigue admitiéndose para el personal, pero no para el comensal:
+            // es secuencial y cambiarlo en la URL dejaría pedir a cuenta ajena.
+            'qr_code'               => ['required_without:table_id', 'nullable', 'string'],
+            'table_id'              => ['required_without:qr_code', 'nullable', 'integer'],
             'notes'                 => ['nullable', 'string'],
             'items'                 => ['required', 'array', 'min:1'],
             'items.*.product_id'    => ['required', 'integer'],
@@ -201,14 +205,21 @@ class OrderController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
-        // La mesa llega del cliente: verificar que pertenece a este restaurante.
-        $mesaPropia = RestaurantTable::where('id', $data['table_id'])
-            ->where('restaurant_id', $restaurant->id)
-            ->exists();
+        // La mesa llega del cliente, así que se resuelve siempre contra este
+        // restaurante: ni el código ni el id valen si son de otro local.
+        $mesa = RestaurantTable::where('restaurant_id', $restaurant->id)
+            ->when(
+                !empty($data['qr_code']),
+                fn($q) => $q->where('qr_code', $data['qr_code']),
+                fn($q) => $q->where('id', $data['table_id']),
+            )
+            ->first();
 
-        if (!$mesaPropia) {
+        if (!$mesa) {
             return response()->json(['message' => 'La mesa no pertenece a este restaurante.'], 422);
         }
+
+        $data['table_id'] = $mesa->id;
 
         $data['type'] = 'dine_in';
 

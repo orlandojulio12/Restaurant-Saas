@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Restaurant;
+use App\Models\RestaurantTable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class MenuController extends Controller
 {
-    public function public(string $restaurantSlug): JsonResponse
+    public function public(Request $request, string $restaurantSlug): JsonResponse
     {
         $restaurant = Restaurant::where('slug', $restaurantSlug)
             ->where('is_active', true)
@@ -25,12 +27,29 @@ class MenuController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        // La mesa llega por su código único, no por id: el id es secuencial y
+        // bastaría con cambiarlo en la URL para pedir a cuenta de otra mesa.
+        $mesa = null;
+
+        if ($request->filled('qr')) {
+            $encontrada = RestaurantTable::where('restaurant_id', $restaurant->id)
+                ->where('qr_code', $request->input('qr'))
+                ->first();
+
+            if ($encontrada) {
+                $mesa = ['id' => $encontrada->id, 'number' => $encontrada->number];
+            }
+        }
+
         return response()->json([
             'restaurant' => [
                 'id'       => $restaurant->id,
                 'name'     => $restaurant->name,
+                'logo_url' => $restaurant->logo_url,
                 'currency' => $restaurant->currency,
             ],
+            // null si el QR no corresponde a ninguna mesa de este restaurante.
+            'table'      => $mesa,
             'categories' => $categories->map(fn($cat) => [
                 'id'       => $cat->id,
                 'name'     => $cat->name,

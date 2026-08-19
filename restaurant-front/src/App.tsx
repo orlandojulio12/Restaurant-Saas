@@ -10,6 +10,7 @@ import Mesas from './features/mesas/Mesas'
 import Finanzas from './features/finanzas/Finanzas'
 import Ajustes from './features/ajustes/Ajustes'
 import Clientes from './features/clientes/Clientes'
+import MenuPublico from './features/publico/MenuPublico'
 import Cobrar from './features/pedidos/Cobrar'
 import NuevoPedido from './features/pedidos/NuevoPedido'
 import Pedidos from './features/pedidos/Pedidos'
@@ -21,6 +22,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Pública: la abre el comensal desde el QR, sin sesión ni panel. */}
+        <Route path="/m/:slug" element={<MenuPublico />} />
+
         <Route path="/entrar" element={<SoloInvitados><Entrar /></SoloInvitados>} />
 
         <Route element={<Protegida><Layout /></Protegida>}>
