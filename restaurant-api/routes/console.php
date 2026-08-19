@@ -14,3 +14,9 @@ Artisan::command('inspire', function () {
 Schedule::command('summaries:generate')
     ->dailyAt('04:00')
     ->withoutOverlapping();
+
+// Devuelve al plan gratuito a quien se le venció lo pagado. Va antes del
+// resumen para que las cifras del día se calculen ya con el plan correcto.
+Schedule::command('subscriptions:expire')
+    ->dailyAt('03:30')
+    ->withoutOverlapping();

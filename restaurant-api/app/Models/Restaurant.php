@@ -105,9 +105,15 @@ class Restaurant extends Model
         return $this->hasOne(FinancialGoal::class);
     }
 
+    /** Cada pago registrado deja su fila; esta es la más reciente. */
     public function subscription(): HasOne
     {
-        return $this->hasOne(Subscription::class);
+        return $this->hasOne(Subscription::class)->latestOfMany('current_period_start');
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
     }
 
     public function dailySummaries(): HasMany

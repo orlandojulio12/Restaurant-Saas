@@ -263,8 +263,17 @@ Estados en `whatsapp_sessions.state`, con el carrito y las listas mostradas en
 `context`:
 
 ```
-greeting → category → product → quantity → cart → address → confirm → (pedido creado)
+greeting → category → product → additionals → quantity → cart → address →
+confirm → (pedido creado)
 ```
+
+El paso de adicionales **se salta** si el producto no tiene ninguno, para no
+alargar la conversación. Cuando los tiene, se recorren grupo por grupo: los de
+tipo `multiple` aceptan varios números separados por coma, los `single` se
+quedan con el primero válido, y los `is_required` no admiten responder *0*.
+Solo se ofrecen adicionales con `is_available`. El precio unitario guardado
+incluye los extras, igual que en `OrderController`, para que ambos caminos
+cuadren.
 
 Las listas que ve el usuario se guardan en el contexto: el «2» que responde solo
 significa algo contra lo que se le mostró. Atajos en cualquier punto: *menú*,
@@ -295,6 +304,37 @@ Seeder: `free` (2 mesas / 20 productos / 20 pedidos día), `basic` ($49.000/mes)
 
 **Ningún límite ni flag se valida hoy en el backend** — solo se exponen en el login.
 
+## Suscripciones (cobro manual)
+
+No hay pasarela de pago. El restaurante paga por fuera —transferencia, Nequi— y
+el pago se registra a mano. Es deliberado: el objetivo de esta etapa es ganar
+clientes, no automatizar el cobro.
+
+```bash
+php artisan subscription:activate el-rincon-de-prueba pro --periods=2 --reference="NEQUI-4471"
+```
+
+```bash
+php artisan subscription:list --expiring=7
+```
+
+Reglas del modelo:
+
+- `restaurants.plan_id` sigue siendo la **fuente de verdad** de límites y
+  funciones. La suscripción es el registro comercial: qué se pagó y hasta cuándo.
+- **Cada activación crea su propia fila**, no actualiza la anterior: así queda el
+  historial de pagos recibidos, que es justo lo que hace falta cobrando a mano.
+- **Renovar antes de tiempo encadena** con el periodo vigente en vez de empezar
+  hoy: el cliente no pierde los días que ya pagó. Cambiar de plan sí arranca hoy.
+- El periodo termina al **final del día local**, no a la hora exacta de la compra.
+- `subscriptions:expire` corre a diario (03:30) y devuelve al plan `free` a quien
+  se le venció. No degrada si ya hay otro periodo encadenado por delante.
+- Sin suscripción vigente = plan gratuito. El registro de un restaurante nuevo no
+  crea fila: el plan `free` no necesita respaldo comercial.
+
+`GET /api/subscription` (solo admin) devuelve plan, estado, días restantes e
+historial para que el frontend lo muestre.
+
 ## Convenciones del código
 
 - Controladores API en `App\Http\Controllers\Api`, retornan `JsonResponse`.
@@ -318,13 +358,13 @@ Usuarios, todos con contraseña `password`:
 
 ## Estado
 
-Los 19 controladores están implementados; no queda ningún esqueleto. Cobertura:
-172 tests, 660 aserciones (`php artisan test`).
+Los 20 controladores están implementados. Cobertura: **213 tests, 858 aserciones**
+(`php artisan test`). Verificado además por HTTP contra MySQL real.
 
 | Módulo | Estado |
 |---|---|
 | Migraciones (26), modelos (24), seeders | ✅ |
-| Auth + `EnsureUserRole` + `RestaurantScope` | ✅ |
+| Alta de restaurantes + auth + roles + aislamiento | ✅ |
 | Pedidos, mesas, menú público por QR | ✅ |
 | Menú: categorías, productos (con imagen), grupos de adicionales, zonas | ✅ |
 | Clientes, usuarios, configuración | ✅ |
@@ -333,24 +373,49 @@ Los 19 controladores están implementados; no queda ningún esqueleto. Cobertura
 | Reportes y módulo financiero | ✅ |
 | Resumen diario (job + comando + schedule) | ✅ |
 | Límites y funciones de plan (`PlanService` + `EnsurePlanFeature`) | ✅ |
+| Suscripciones con cobro manual | ✅ |
 | WebSockets con Reverb | ✅ verificado en vivo |
-| Bot de WhatsApp | ✅ con `Http::fake`; falta probar contra Meta real |
+| Bot de WhatsApp, adicionales incluidos | ✅ con `Http::fake`; falta probar contra Meta |
+| Documentación OpenAPI (`/docs/api`) | ✅ |
 
-### Pendiente
+### Pendiente antes de producción
 
-- **Probar el bot contra la API real de Meta.** `WHATSAPP_TOKEN` y `WHATSAPP_PHONE_ID`
-  están vacíos en `.env`; hace falta una cuenta de WhatsApp Business y exponer el webhook
-  por HTTPS (ngrok o similar) para el handshake de verificación.
-- El bot solo maneja mensajes de texto, y no ofrece adicionales al armar el pedido.
-- Facturación/`subscriptions`: la tabla existe, no hay lógica ni pasarela.
-- `shifts` (turnos de caja): tabla y modelo existen, sin controlador ni rutas.
-- El enum `orders.status` incluye `paid`, que ninguna transición usa: el pago cierra
-  directamente a `closed`.
-- **Sanctum `guard => ['web']`** en `config/sanctum.php` con auth por token Bearer.
-  Funciona por el fallback, pero merece revisión si aparece comportamiento raro de sesión.
-- **`.env` está presente en el directorio** con credenciales de Reverb y WhatsApp.
-  Verificar que quede fuera de cualquier repo antes de publicar.
-- **El proyecto no es un repositorio git.** No hay historial ni respaldo.
+Decidido con el cliente; el orden refleja lo que bloquea de verdad.
+
+**Al desplegar (no bloquea el frontend):**
+
+- **Supervisar el worker y el cron.** Sin `queue:work` vivo no se emite ningún
+  evento en tiempo real y la cocina deja de recibir pedidos **en silencio**. Hace
+  falta Supervisor o systemd que lo reinicie, y una entrada de cron que ejecute
+  `php artisan schedule:run` cada minuto para el resumen diario y el vencimiento
+  de suscripciones. Es el punto de fallo más silencioso de todo el sistema.
+- **Imágenes en disco local.** Van por `storage:link`. Sirve en Hostinger con una
+  sola instancia; con varias hay que mover el disco a S3 o equivalente.
+- **Credenciales de WhatsApp.** El bot está construido y probado con `Http::fake`,
+  pero nunca habló con Meta. Hace falta cuenta de WhatsApp Business, un número
+  dedicado y exponer el webhook por HTTPS para el handshake.
+  **Coste:** la Cloud API no cobra por acceso ni por los mensajes que el bot
+  envía, porque todos caen dentro de la ventana de atención de 24 h que abre el
+  cliente al escribir. Solo se pagan plantillas enviadas fuera de esa ventana,
+  que el diseño actual no usa. Reconfirmar tarifas antes de lanzar.
+
+**Aplazado a una 2.0:**
+
+- **Recuperación de contraseña.** Hoy solo un admin puede cambiar la de un
+  empleado. Falta el flujo por correo — y con él configurar el envío real:
+  `MAIL_MAILER` apunta al log. Se hará cuando el producto tenga nombre y buzón.
+- **Turnos de caja.** `shifts` tiene tabla y modelo desde el principio, sin
+  controlador ni rutas. Solo importa si se quiere cuadre de caja por turno.
+- **Pasarela de pago.** El cobro es manual a propósito (ver Suscripciones).
+
+**Menores:**
+
+- El bot solo procesa texto: audio, imágenes y ubicación aún no.
+- El enum `orders.status` incluye `paid`, que ninguna transición usa: el pago
+  cierra directamente a `closed`.
+- **Sanctum `guard => ['web']`** en `config/sanctum.php` con auth por token
+  Bearer. Funciona por el fallback, pero merece revisión si aparece
+  comportamiento raro de sesión.
 
 ### Bugs corregidos que conviene no reintroducir
 

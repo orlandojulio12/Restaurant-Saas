@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderItemAdditional;
 use App\Models\Product;
 use App\Models\Restaurant;
 use App\Models\WhatsappSession;
@@ -15,8 +16,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * Bot conversacional de pedidos por WhatsApp.
  *
- * Flujo: saludo → categoría → producto → cantidad → carrito → dirección →
- * confirmación → pedido creado.
+ * Flujo: saludo → categoría → producto → adicionales → cantidad → carrito →
+ * dirección → confirmación → pedido creado.
+ *
+ * El paso de adicionales se salta si el producto no tiene ninguno.
  *
  * El estado vive en whatsapp_sessions.state y el contexto (listas mostradas,
  * carrito, dirección) en whatsapp_sessions.context. Las listas que ve el
@@ -72,6 +75,7 @@ class WhatsappBotService
             'greeting' => $this->saludar($restaurant, $phone, $context),
             'category' => $this->elegirCategoria($restaurant, $phone, $texto, $context),
             'product'  => $this->elegirProducto($restaurant, $phone, $texto, $context),
+            'additionals' => $this->elegirAdicionales($restaurant, $phone, $texto, $context),
             'quantity' => $this->elegirCantidad($restaurant, $phone, $texto, $context),
             'cart'     => $this->decidirCarrito($restaurant, $phone, $texto, $context),
             'address'  => $this->recibirDireccion($restaurant, $phone, $texto, $context),
@@ -156,14 +160,73 @@ class WhatsappBotService
         $producto = Product::find($ids[$indice]);
 
         $context['pending'] = [
-            'product_id' => $producto->id,
-            'name'       => $producto->name,
-            'price'      => (float) $producto->price,
+            'product_id'  => $producto->id,
+            'name'        => $producto->name,
+            'price'       => (float) $producto->price,
+            'additionals' => [],
         ];
+
+        // Solo se pregunta por adicionales si el producto tiene alguno; si no,
+        // se va directo a la cantidad para no alargar la conversación.
+        $grupos = $this->gruposDeAdicionales($producto);
+
+        if ($grupos) {
+            $context['pending']['groups']      = $grupos;
+            $context['pending']['group_index'] = 0;
+
+            $this->preguntarGrupo($phone, $restaurant, $grupos[0]);
+
+            return ['additionals', $context];
+        }
 
         $this->responder($phone, "¿Cuántas unidades de *{$producto->name}* quieres? Responde con un número.");
 
         return ['quantity', $context];
+    }
+
+    /**
+     * Recorre los grupos de adicionales del producto, uno por mensaje.
+     *
+     * Las opciones van en el contexto por la misma razón que las demás listas:
+     * el número que responde el cliente solo significa algo contra lo que se
+     * le mostró.
+     */
+    private function elegirAdicionales(Restaurant $restaurant, string $phone, string $texto, array $context): array
+    {
+        $pendiente = $context['pending'] ?? null;
+
+        if (!$pendiente || empty($pendiente['groups'])) {
+            return $this->saludar($restaurant, $phone, $context);
+        }
+
+        $indice = $pendiente['group_index'] ?? 0;
+        $grupo  = $pendiente['groups'][$indice] ?? null;
+
+        if (!$grupo) {
+            return $this->pedirCantidad($restaurant, $phone, $context);
+        }
+
+        $elegidos = $this->interpretarAdicionales($texto, $grupo);
+
+        if ($elegidos === null) {
+            $this->preguntarGrupo($phone, $restaurant, $grupo, reintento: true);
+
+            return ['additionals', $context];
+        }
+
+        $pendiente['additionals'] = array_merge($pendiente['additionals'] ?? [], $elegidos);
+        $pendiente['group_index'] = $indice + 1;
+        $context['pending']       = $pendiente;
+
+        $siguiente = $pendiente['groups'][$pendiente['group_index']] ?? null;
+
+        if ($siguiente) {
+            $this->preguntarGrupo($phone, $restaurant, $siguiente);
+
+            return ['additionals', $context];
+        }
+
+        return $this->pedirCantidad($restaurant, $phone, $context);
     }
 
     private function elegirCantidad(Restaurant $restaurant, string $phone, string $texto, array $context): array
@@ -182,8 +245,23 @@ class WhatsappBotService
             return $this->saludar($restaurant, $phone, $context);
         }
 
-        $carrito   = $context['cart'] ?? [];
-        $carrito[] = [...$pendiente, 'quantity' => $cantidad];
+        $extras      = $pendiente['additionals'] ?? [];
+        $extraUnidad = array_sum(array_column($extras, 'extra_price'));
+
+        $carrito = $context['cart'] ?? [];
+
+        // Solo lo que describe la línea: los grupos y el índice del recorrido
+        // eran andamiaje del paso anterior y no pintan nada en el carrito.
+        // El precio unitario ya lleva los adicionales sumados, igual que en
+        // OrderController, para que el total cuadre entre ambos caminos.
+        $carrito[] = [
+            'product_id'  => $pendiente['product_id'],
+            'name'        => $pendiente['name'],
+            'base_price'  => $pendiente['price'],
+            'price'       => $pendiente['price'] + $extraUnidad,
+            'additionals' => $extras,
+            'quantity'    => $cantidad,
+        ];
 
         $context['cart'] = $carrito;
         unset($context['pending']);
@@ -319,7 +397,7 @@ class WhatsappBotService
             ]);
 
             foreach ($context['cart'] as $linea) {
-                OrderItem::create([
+                $item = OrderItem::create([
                     'order_id'     => $order->id,
                     'product_id'   => $linea['product_id'],
                     'product_name' => $linea['name'],
@@ -327,6 +405,17 @@ class WhatsappBotService
                     'quantity'     => $linea['quantity'],
                     'subtotal'     => $linea['price'] * $linea['quantity'],
                 ]);
+
+                // Se desnormalizan nombre y precio, como en el resto del
+                // sistema: el histórico no cambia si luego se edita la carta.
+                foreach ($linea['additionals'] ?? [] as $extra) {
+                    OrderItemAdditional::create([
+                        'order_item_id'   => $item->id,
+                        'additional_id'   => $extra['id'],
+                        'additional_name' => $extra['name'],
+                        'extra_price'     => $extra['extra_price'],
+                    ]);
+                }
             }
 
             return $order;
@@ -352,6 +441,147 @@ class WhatsappBotService
         $context['categories'] = $categorias->pluck('id')->all();
 
         return ['category', $context];
+    }
+
+    /**
+     * Pide la cantidad, recordando lo que se lleva elegido del producto.
+     */
+    private function pedirCantidad(Restaurant $restaurant, string $phone, array $context): array
+    {
+        $pendiente = $context['pending'];
+        $extras    = $pendiente['additionals'] ?? [];
+
+        $lineas = ["*{$pendiente['name']}*"];
+
+        foreach ($extras as $extra) {
+            $precio   = $extra['extra_price'] > 0
+                ? ' (+' . $this->dinero($extra['extra_price'], $restaurant) . ')'
+                : '';
+            $lineas[] = "  + {$extra['name']}{$precio}";
+        }
+
+        $lineas[] = '';
+        $lineas[] = '¿Cuántas unidades quieres? Responde con un número.';
+
+        $this->responder($phone, implode("
+", $lineas));
+
+        return ['quantity', $context];
+    }
+
+    /**
+     * Muestra las opciones de un grupo de adicionales.
+     */
+    private function preguntarGrupo(string $phone, Restaurant $restaurant, array $grupo, bool $reintento = false): void
+    {
+        $lineas = [];
+
+        if ($reintento) {
+            $lineas[] = 'No entendí tu respuesta.';
+            $lineas[] = '';
+        }
+
+        $varias   = $grupo['selection_type'] === 'multiple';
+        $lineas[] = "*{$grupo['name']}*" . ($varias ? ' _(puedes elegir varias)_' : ' _(elige una)_');
+        $lineas[] = '';
+
+        foreach ($grupo['options'] as $i => $opcion) {
+            $precio   = $opcion['extra_price'] > 0
+                ? ' — +' . $this->dinero($opcion['extra_price'], $restaurant)
+                : '';
+            $lineas[] = ($i + 1) . ". {$opcion['name']}{$precio}";
+        }
+
+        $lineas[] = '';
+        $lineas[] = $varias
+            ? 'Responde con los números separados por coma'
+                . ($grupo['is_required'] ? '.' : ', o *0* si no quieres ninguno.')
+            : 'Responde con el número'
+                . ($grupo['is_required'] ? '.' : ', o *0* si no quieres ninguno.');
+
+        $this->responder($phone, implode("
+", $lineas));
+    }
+
+    /**
+     * Interpreta la respuesta del cliente para un grupo.
+     *
+     * Devuelve los adicionales elegidos, una lista vacía si dijo que ninguno,
+     * o null si la respuesta no sirve y hay que volver a preguntar.
+     *
+     * @return array<int, array{id: int, name: string, extra_price: float}>|null
+     */
+    private function interpretarAdicionales(string $texto, array $grupo): ?array
+    {
+        $normalizado = $this->normalizar($texto);
+
+        if (in_array($normalizado, ['0', 'ninguno', 'ninguna', 'nada', 'no'], true)) {
+            // Un grupo obligatorio no admite quedarse sin elegir.
+            return $grupo['is_required'] ? null : [];
+        }
+
+        preg_match_all('/\d+/', $texto, $coincidencias);
+
+        $opciones  = $grupo['options'];
+        $seleccion = [];
+
+        foreach ($coincidencias[0] as $numero) {
+            $numero = (int) $numero;
+
+            if ($numero < 1 || $numero > count($opciones)) {
+                continue;
+            }
+
+            // Indexado por id: repetir el mismo número no lo duplica.
+            $seleccion[$opciones[$numero - 1]['id']] = $opciones[$numero - 1];
+
+            if ($grupo['selection_type'] !== 'multiple') {
+                break;
+            }
+        }
+
+        return $seleccion ? array_values($seleccion) : null;
+    }
+
+    /**
+     * Grupos de adicionales del producto, con sus opciones disponibles.
+     *
+     * Se omiten los grupos que se quedaron sin opciones activas: preguntar por
+     * un grupo vacío dejaría la conversación sin salida.
+     *
+     * @return array<int, array{id: int, name: string, selection_type: string, is_required: bool, options: array}>
+     */
+    private function gruposDeAdicionales(Product $producto): array
+    {
+        $producto->load([
+            'additionalGroups' => fn($q) => $q->orderBy('sort_order')->orderBy('name'),
+            'additionalGroups.additionals' => fn($q) => $q
+                ->where('is_available', true)
+                ->orderBy('sort_order')
+                ->orderBy('name'),
+        ]);
+
+        $grupos = [];
+
+        foreach ($producto->additionalGroups as $grupo) {
+            if ($grupo->additionals->isEmpty()) {
+                continue;
+            }
+
+            $grupos[] = [
+                'id'             => $grupo->id,
+                'name'           => $grupo->name,
+                'selection_type' => $grupo->selection_type,
+                'is_required'    => (bool) $grupo->is_required,
+                'options'        => $grupo->additionals->map(fn($a) => [
+                    'id'          => $a->id,
+                    'name'        => $a->name,
+                    'extra_price' => (float) $a->extra_price,
+                ])->values()->all(),
+            ];
+        }
+
+        return $grupos;
     }
 
     private function categorias(Restaurant $restaurant)
@@ -383,6 +613,10 @@ class WhatsappBotService
             $subtotal = $linea['price'] * $linea['quantity'];
             $total   += $subtotal;
             $lineas[] = "• {$linea['quantity']} × {$linea['name']} — " . $this->dinero($subtotal, $restaurant);
+
+            foreach ($linea['additionals'] ?? [] as $extra) {
+                $lineas[] = "    + {$extra['name']}";
+            }
         }
 
         $lineas[] = '*Total: ' . $this->dinero($total, $restaurant) . '*';

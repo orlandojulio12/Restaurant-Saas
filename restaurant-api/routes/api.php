@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\FinancialController;
 use App\Http\Controllers\Api\FixedCostController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\ZoneController;
 use App\Http\Controllers\Api\WhatsappController;
@@ -107,6 +108,9 @@ Route::middleware(['auth:sanctum', 'restaurant.scope'])->group(function () {
 
     // Solo admin
     Route::middleware('role:admin')->group(function () {
+        // Estado del plan y pagos. El cobro es manual: no hay alta por API.
+        Route::get('/subscription', [SubscriptionController::class, 'show']);
+
         Route::apiResource('users', UserController::class);
         Route::apiResource('zones', ZoneController::class);
     });
