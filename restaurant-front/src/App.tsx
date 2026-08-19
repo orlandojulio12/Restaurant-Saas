@@ -4,6 +4,8 @@ import Layout from './components/Layout'
 import Entrar from './features/auth/Entrar'
 import { useSesion } from './features/auth/SesionContext'
 import Cocina from './features/cocina/Cocina'
+import Inventario from './features/inventario/Inventario'
+import Menu from './features/menu/Menu'
 import Mesas from './features/mesas/Mesas'
 import Cobrar from './features/pedidos/Cobrar'
 import NuevoPedido from './features/pedidos/NuevoPedido'
@@ -24,8 +26,8 @@ export default function App() {
           <Route path="/pedidos/:id" element={<PedidoDetalle />} />
           <Route path="/pedidos/:id/cobrar" element={<Cobrar />} />
           <Route path="/cocina" element={<Cocina />} />
-          <Route path="/menu" element={<EnObra titulo="Menú" />} />
-          <Route path="/inventario" element={<EnObra titulo="Inventario" />} />
+          <Route path="/menu" element={<Menu />} />
+          <Route path="/inventario" element={<Inventario />} />
           <Route path="/reportes" element={<EnObra titulo="Reportes" />} />
           <Route path="/finanzas" element={<EnObra titulo="Finanzas" />} />
           <Route path="/clientes" element={<EnObra titulo="Clientes" />} />
