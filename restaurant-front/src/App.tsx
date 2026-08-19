@@ -9,6 +9,7 @@ import Menu from './features/menu/Menu'
 import Mesas from './features/mesas/Mesas'
 import Finanzas from './features/finanzas/Finanzas'
 import Ajustes from './features/ajustes/Ajustes'
+import QrImprimibles from './features/ajustes/QrImprimibles'
 import Clientes from './features/clientes/Clientes'
 import MenuPublico from './features/publico/MenuPublico'
 import Cobrar from './features/pedidos/Cobrar'
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/finanzas" element={<Finanzas />} />
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/ajustes" element={<Ajustes />} />
+          <Route path="/ajustes/qr" element={<QrImprimibles />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

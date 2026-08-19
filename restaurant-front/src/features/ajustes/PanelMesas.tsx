@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { interpretarError } from '../../api/client'
 import { gestionAjustes } from '../../api/gestion'
@@ -56,7 +57,18 @@ export default function PanelMesas() {
               Cada una lleva su propio QR para que el cliente pida desde el móvil.
             </p>
           </div>
-          <BotonPrimario onClick={() => setEditandoMesa('nueva')}>+ Mesa</BotonPrimario>
+          <div className="flex gap-2">
+            {listaMesas.length > 0 && (
+              <Link
+                to="/ajustes/qr"
+                className="flex min-h-11 items-center rounded-xl border border-piedra-300 px-4
+                           text-sm font-semibold text-piedra-700 transition hover:bg-piedra-100"
+              >
+                Imprimir QR
+              </Link>
+            )}
+            <BotonPrimario onClick={() => setEditandoMesa('nueva')}>+ Mesa</BotonPrimario>
+          </div>
         </header>
 
         {mesas.isLoading ? (
