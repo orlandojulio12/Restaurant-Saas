@@ -4,6 +4,8 @@ import Layout from './components/Layout'
 import Entrar from './features/auth/Entrar'
 import { useSesion } from './features/auth/SesionContext'
 import Mesas from './features/mesas/Mesas'
+import NuevoPedido from './features/pedidos/NuevoPedido'
+import PedidoDetalle from './features/pedidos/PedidoDetalle'
 import type { Rol } from './api/tipos'
 
 export default function App() {
@@ -16,6 +18,8 @@ export default function App() {
           <Route index element={<Inicio />} />
           <Route path="/mesas" element={<Mesas />} />
           <Route path="/pedidos" element={<EnObra titulo="Pedidos" />} />
+          <Route path="/pedidos/nuevo" element={<NuevoPedido />} />
+          <Route path="/pedidos/:id" element={<PedidoDetalle />} />
           <Route path="/cocina" element={<EnObra titulo="Cocina" />} />
           <Route path="/menu" element={<EnObra titulo="Menú" />} />
           <Route path="/inventario" element={<EnObra titulo="Inventario" />} />
