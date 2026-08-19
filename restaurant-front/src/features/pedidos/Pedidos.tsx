@@ -3,7 +3,16 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { pedidosApi } from '../../api/pedidos'
 import type { EstadoPedido, Pedido } from '../../api/tipos'
-import { dinero, ESTADOS, minutosDesde, TIPOS, transcurrido } from '../../lib/formato'
+import {
+  diaDe,
+  dinero,
+  ESTADOS,
+  etiquetaDia,
+  hora,
+  minutosDesde,
+  TIPOS,
+  transcurrido,
+} from '../../lib/formato'
 import { useSesion } from '../auth/SesionContext'
 
 /**
@@ -136,13 +145,26 @@ export default function Pedidos() {
         </div>
       )}
 
-      <ul className="flex flex-col gap-2">
-        {pedidos.map((pedido) => (
-          <li key={pedido.id}>
-            <FilaPedido pedido={pedido} moneda={moneda} />
-          </li>
-        ))}
-      </ul>
+      {/* Agrupado por día: un pedido de ayer y otro de hoy no pueden
+          distinguirse solo por el tiempo transcurrido. */}
+      {agruparPorDia(pedidos).map(([dia, delDia]) => (
+        <section key={dia} className="mb-5">
+          <h2 className="mb-2 px-1 text-sm font-semibold text-piedra-500">
+            {etiquetaDia(delDia[0].created_at)}
+            <span className="cifras ml-2 font-normal text-piedra-400">
+              {delDia.length} pedido{delDia.length === 1 ? '' : 's'}
+            </span>
+          </h2>
+
+          <ul className="flex flex-col gap-2">
+            {delDia.map((pedido) => (
+              <li key={pedido.id}>
+                <FilaPedido pedido={pedido} moneda={moneda} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
 
       {meta && meta.last_page > 1 && (
         <nav className="mt-5 flex items-center justify-center gap-3">
@@ -169,6 +191,18 @@ export default function Pedidos() {
       )}
     </div>
   )
+}
+
+/** Agrupa manteniendo el orden que ya trae el servidor (más nuevo primero). */
+function agruparPorDia(pedidos: Pedido[]): [string, Pedido[]][] {
+  const mapa = new Map<string, Pedido[]>()
+
+  for (const pedido of pedidos) {
+    const dia = diaDe(pedido.created_at)
+    mapa.set(dia, [...(mapa.get(dia) ?? []), pedido])
+  }
+
+  return [...mapa.entries()]
 }
 
 function FilaPedido({ pedido, moneda }: { pedido: Pedido; moneda: string }) {
@@ -209,12 +243,14 @@ function FilaPedido({ pedido, moneda }: { pedido: Pedido; moneda: string }) {
 
       <div className="shrink-0 text-right">
         <p className="cifras font-bold text-piedra-900">{dinero(pedido.total, moneda)}</p>
+        {/* En uno abierto importa cuánto lleva esperando; en uno cerrado,
+            a qué hora fue. */}
         <p
           className={`cifras text-xs ${
             urgente ? 'font-semibold text-urgente' : lenta ? 'font-semibold text-atencion' : 'text-piedra-400'
           }`}
         >
-          {transcurrido(espera)}
+          {abierto ? transcurrido(espera) : hora(pedido.created_at)}
         </p>
       </div>
     </Link>

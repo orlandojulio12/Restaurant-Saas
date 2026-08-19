@@ -152,6 +152,29 @@ class CustomerControllerTest extends TestCase
         $this->deleteJson("/api/customers/{$ajeno->id}")->assertForbidden();
     }
 
+    /**
+     * Un cliente sin nombre ni teléfono no se puede buscar ni contactar: solo
+     * ensucia el listado. Antes un POST con el cuerpo vacío devolvía 201.
+     */
+    public function test_exige_al_menos_nombre_o_telefono(): void
+    {
+        $this->postJson('/api/customers', [])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['name', 'phone']);
+
+        $this->assertSame(0, Customer::count());
+    }
+
+    public function test_basta_con_el_nombre(): void
+    {
+        $this->postJson('/api/customers', ['name' => 'Solo nombre'])->assertCreated();
+    }
+
+    public function test_basta_con_el_telefono(): void
+    {
+        $this->postJson('/api/customers', ['phone' => '3001234567'])->assertCreated();
+    }
+
     private function cliente(string $nombre, string $telefono): Customer
     {
         return Customer::create([

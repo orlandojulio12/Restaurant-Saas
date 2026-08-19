@@ -1,7 +1,13 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { interpretarError } from '../../api/client'
-import { gestionInventario, type Ingrediente, type Movimiento } from '../../api/gestion'
+import {
+  gestionInventario,
+  gestionMenu,
+  type Ingrediente,
+  type Movimiento,
+} from '../../api/gestion'
 import {
   AvisoError,
   BotonPrimario,
@@ -35,6 +41,24 @@ export default function Inventario() {
   const clienteQuery = useQueryClient()
 
   const [seccion, setSeccion] = useState<Seccion>('ingredientes')
+
+  // Un producto sin receta no descuenta nada al venderse: el inventario deja
+  // de reflejar la realidad sin avisar. No se obliga a tener receta —hay
+  // productos que se venden por unidad, y el plan gratis ni siquiera tiene
+  // inventario— pero sí se dice cuáles quedan fuera del control.
+  const productos = useQuery({ queryKey: ['productos'], queryFn: gestionMenu.productos })
+  const recetas = useQuery({
+    queryKey: ['recetas', 'cobertura'],
+    queryFn: async () => {
+      const lista = await gestionMenu.productos()
+      const detalles = await Promise.all(
+        lista.map((p) => gestionInventario.receta(p.id).catch(() => null)),
+      )
+
+      return lista.filter((_, i) => (detalles[i]?.ingredients.length ?? 0) === 0)
+    },
+    enabled: (productos.data?.length ?? 0) > 0,
+  })
   const [soloAlerta, setSoloAlerta] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editando, setEditando] = useState<Ingrediente | null | 'nuevo'>(null)
@@ -119,6 +143,8 @@ export default function Inventario() {
 
       {seccion === 'ingredientes' && (
         <>
+          <SinReceta productos={recetas.data ?? []} cargando={recetas.isLoading} />
+
           {enAlerta > 0 && (
             <button
               onClick={() => setSoloAlerta((v) => !v)}
@@ -327,5 +353,55 @@ function Esqueleto() {
         <li key={i} className="h-32 animate-pulse rounded-2xl bg-piedra-200" />
       ))}
     </ul>
+  )
+}
+
+/**
+ * Productos que no descuentan inventario porque no tienen receta.
+ *
+ * No es un error: hay productos que se venden por unidad y no hay por qué
+ * modelarlos. Pero conviene saber qué queda fuera del control, porque el
+ * inventario calla esa parte sin avisar.
+ */
+function SinReceta({ productos, cargando }: { productos: { id: number; name: string }[]; cargando: boolean }) {
+  const [abierto, setAbierto] = useState(false)
+
+  if (cargando || productos.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-xl border border-pendiente bg-pendiente-suave p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-pendiente">
+          {productos.length} producto{productos.length === 1 ? '' : 's'} sin receta
+        </p>
+        <button
+          onClick={() => setAbierto((v) => !v)}
+          className="text-sm font-semibold text-pendiente underline underline-offset-4"
+        >
+          {abierto ? 'Ocultar' : 'Ver cuáles'}
+        </button>
+      </div>
+
+      <p className="mt-1 text-sm text-pendiente">
+        Al venderse no descuentan nada del inventario. Si se preparan con ingredientes, defíneles
+        la receta; si se venden por unidad —una gaseosa, un agua— puedes dejarlo así.
+      </p>
+
+      {abierto && (
+        <ul className="mt-3 flex flex-wrap gap-1.5">
+          {productos.map((p) => (
+            <li key={p.id}>
+              <Link
+                to={`/menu?producto=${p.id}`}
+                className="inline-block rounded-lg bg-white/70 px-2.5 py-1 text-sm
+                           font-medium text-pendiente hover:bg-white"
+              >
+                {p.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

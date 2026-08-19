@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, type InputHTMLAttributes, type ReactNode } from 'react'
 
 /**
  * Piezas compartidas de los paneles de gestión.
@@ -78,6 +78,42 @@ export function Campo({
 export const claseEntrada =
   'min-h-12 w-full rounded-xl border border-piedra-300 px-3.5 text-piedra-900 ' +
   'focus:border-marca-500 focus:outline-none'
+
+/**
+ * Campo de texto completo: etiqueta más entrada.
+ *
+ * `Campo` deja el control en manos de quien lo usa —hace falta para selects,
+ * textareas y ficheros—, pero la mayoría de los formularios solo quieren un
+ * input, y repetir la clase en cada uno invita a que se desalineen.
+ */
+export function CampoTexto({
+  etiqueta,
+  ayuda,
+  error,
+  valor,
+  onCambio,
+  tipo = 'text',
+  ...resto
+}: {
+  etiqueta: string
+  ayuda?: string
+  error?: string
+  valor: string
+  onCambio: (v: string) => void
+  tipo?: string
+} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
+  return (
+    <Campo etiqueta={etiqueta} ayuda={ayuda} error={error}>
+      <input
+        type={tipo}
+        value={valor}
+        onChange={(e) => onCambio(e.target.value)}
+        className={claseEntrada}
+        {...resto}
+      />
+    </Campo>
+  )
+}
 
 export function Pestanas<T extends string>({
   actual,

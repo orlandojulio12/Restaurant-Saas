@@ -1,5 +1,7 @@
 import { api } from './client'
 import type {
+  Mesa,
+  Zona,
   Categoria,
   GrupoAdicionales,
   Paginado,
@@ -171,4 +173,106 @@ export const gestionInventario = {
     productoId: number,
     ingredientes: { ingredient_id: number; quantity: number }[],
   ) => (await api.put<Receta>(`/products/${productoId}/ingredients`, { ingredients: ingredientes })).data,
+}
+
+// ── Ajustes del restaurante ────────────────────────────────────────────────
+
+export type Ajustes = {
+  restaurant: {
+    id: number
+    name: string
+    slug: string
+    phone: string | null
+    whatsapp_number: string | null
+    address: string | null
+    city: string | null
+    country: string | null
+    logo_url: string | null
+    currency: string
+    timezone: string
+  }
+  plan: {
+    name: string
+    display_name: string
+    has_whatsapp: boolean
+    has_inventory: boolean
+    has_reports: boolean
+    has_financials: boolean
+  }
+  settings: {
+    mode: string
+    tax_percent: number
+    print_kitchen: boolean
+    notify_sound: boolean
+  }
+}
+
+export type Usuario = {
+  id: number
+  name: string
+  email: string
+  role: 'admin' | 'waiter' | 'kitchen' | 'cashier'
+  is_active: boolean
+  last_login_at: string | null
+}
+
+export const gestionAjustes = {
+  leer: async () => (await api.get<Ajustes>('/settings')).data,
+
+  guardar: async (datos: Record<string, unknown>, logo?: File | null) => {
+    if (!logo) {
+      return (await api.put<Ajustes>('/settings', datos)).data
+    }
+
+    // Con archivo hay que ir por POST + _method: PHP no parsea multipart en PUT.
+    const cuerpo = new FormData()
+    cuerpo.append('_method', 'PUT')
+    cuerpo.append('logo', logo)
+
+    for (const [clave, valor] of Object.entries(datos)) {
+      if (valor === null || valor === undefined) continue
+
+      if (clave === 'settings' && typeof valor === 'object') {
+        for (const [k, v] of Object.entries(valor as Record<string, unknown>)) {
+          cuerpo.append(`settings[${k}]`, typeof v === 'boolean' ? (v ? '1' : '0') : String(v))
+        }
+        continue
+      }
+
+      cuerpo.append(clave, String(valor))
+    }
+
+    return (await api.post<Ajustes>('/settings', cuerpo)).data
+  },
+
+  zonas: async () => (await api.get<Zona[]>('/zones')).data,
+
+  guardarZona: async (datos: { name: string; sort_order?: number }, id?: number) =>
+    id
+      ? (await api.put<Zona>(`/zones/${id}`, datos)).data
+      : (await api.post<Zona>('/zones', datos)).data,
+
+  borrarZona: async (id: number, forzar = false) =>
+    api.delete(`/zones/${id}`, { params: forzar ? { force: true } : {} }),
+
+  mesas: async () => (await api.get<Mesa[]>('/tables')).data,
+
+  guardarMesa: async (
+    datos: { number: string; capacity?: number; zone_id?: number | null; status?: string },
+    id?: number,
+  ) =>
+    id
+      ? (await api.put<Mesa>(`/tables/${id}`, datos)).data
+      : (await api.post<Mesa>('/tables', datos)).data,
+
+  borrarMesa: async (id: number) => api.delete(`/tables/${id}`),
+
+  usuarios: async () => (await api.get<Usuario[]>('/users')).data,
+
+  guardarUsuario: async (datos: Record<string, unknown>, id?: number) =>
+    id
+      ? (await api.put<Usuario>(`/users/${id}`, datos)).data
+      : (await api.post<Usuario>('/users', datos)).data,
+
+  borrarUsuario: async (id: number) => api.delete(`/users/${id}`),
 }

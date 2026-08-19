@@ -96,11 +96,14 @@ class CustomerController extends Controller
         $required = $customer ? 'sometimes' : 'nullable';
 
         return [
-            'name'    => [$required, 'nullable', 'string', 'max:100'],
+            // Al menos uno de los dos: un cliente sin nombre ni teléfono no se
+            // puede buscar ni contactar, y solo ensucia el listado. Antes un
+            // POST con el cuerpo vacío creaba una ficha en blanco.
+            'name'    => [$required, 'nullable', 'required_without:phone', 'string', 'max:100'],
             'address' => ['nullable', 'string'],
             'notes'   => ['nullable', 'string'],
             'phone'   => [
-                'nullable', 'string', 'max:30',
+                'nullable', 'required_without:name', 'string', 'max:30',
                 // El teléfono identifica al cliente dentro del restaurante,
                 // pero puede repetirse entre restaurantes distintos.
                 Rule::unique('customers')

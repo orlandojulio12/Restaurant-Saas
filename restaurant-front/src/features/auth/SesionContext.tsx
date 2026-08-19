@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api, borrarToken, guardarToken, leerToken } from '../../api/client'
 import type { Restaurante, Rol, Usuario } from '../../api/tipos'
+import { configurarZona } from '../../lib/formato'
 
 type Sesion = {
   usuario: Usuario
@@ -37,7 +38,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
 
     api
       .get('/auth/me')
-      .then(({ data }) => setSesion({ usuario: data.user, restaurante: data.restaurant }))
+      .then(({ data }) => {
+        configurarZona(data.restaurant?.timezone)
+        setSesion({ usuario: data.user, restaurante: data.restaurant })
+      })
       .catch(() => borrarToken())
       .finally(() => setCargando(false))
   }, [])
@@ -48,6 +52,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       cargando,
       entrar: (token, nueva) => {
         guardarToken(token)
+        configurarZona(nueva.restaurante.timezone)
         setSesion(nueva)
       },
       salir: async () => {

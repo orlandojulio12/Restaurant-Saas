@@ -8,6 +8,8 @@ import Inventario from './features/inventario/Inventario'
 import Menu from './features/menu/Menu'
 import Mesas from './features/mesas/Mesas'
 import Finanzas from './features/finanzas/Finanzas'
+import Ajustes from './features/ajustes/Ajustes'
+import Clientes from './features/clientes/Clientes'
 import Cobrar from './features/pedidos/Cobrar'
 import NuevoPedido from './features/pedidos/NuevoPedido'
 import Pedidos from './features/pedidos/Pedidos'
@@ -33,8 +35,8 @@ export default function App() {
           <Route path="/inventario" element={<Inventario />} />
           <Route path="/reportes" element={<Reportes />} />
           <Route path="/finanzas" element={<Finanzas />} />
-          <Route path="/clientes" element={<EnObra titulo="Clientes" />} />
-          <Route path="/ajustes" element={<EnObra titulo="Ajustes" />} />
+          <Route path="/clientes" element={<Clientes />} />
+          <Route path="/ajustes" element={<Ajustes />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -79,15 +81,6 @@ function Esperando() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-piedra-50">
       <span className="text-sm text-piedra-500">Cargando…</span>
-    </div>
-  )
-}
-
-function EnObra({ titulo }: { titulo: string }) {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-piedra-900">{titulo}</h1>
-      <p className="mt-2 text-sm text-piedra-500">Esta pantalla es la siguiente en construirse.</p>
     </div>
   )
 }
