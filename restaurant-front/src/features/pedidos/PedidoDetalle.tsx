@@ -3,7 +3,15 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { interpretarError } from '../../api/client'
 import { pedidosApi } from '../../api/pedidos'
 import type { EstadoPedido } from '../../api/tipos'
-import { dinero, ESTADOS, minutosDesde, SIGUIENTES, TIPOS, transcurrido } from '../../lib/formato'
+import {
+  dinero,
+  ESTADOS,
+  METODOS_PAGO,
+  minutosDesde,
+  SIGUIENTES,
+  TIPOS,
+  transcurrido,
+} from '../../lib/formato'
 import { useSesion } from '../auth/SesionContext'
 
 /** Qué palabra usar para cada avance, desde el punto de vista de quien pulsa. */
@@ -94,8 +102,8 @@ export default function PedidoDetalle() {
           <p className="mt-3 text-sm text-piedra-600">📍 {pedido.delivery_address}</p>
         )}
         {pedido.notes && (
-          <p className="mt-2 rounded-lg bg-[var(--color-pendiente-suave)] px-3 py-2 text-sm
-                        text-[var(--color-pendiente)]">
+          <p className="mt-2 rounded-lg bg-pendiente-suave px-3 py-2 text-sm
+                        text-pendiente">
             {pedido.notes}
           </p>
         )}
@@ -116,7 +124,7 @@ export default function PedidoDetalle() {
                   </p>
                 )}
                 {linea.notes && (
-                  <p className="mt-0.5 text-sm italic text-[var(--color-pendiente)]">
+                  <p className="mt-0.5 text-sm italic text-pendiente">
                     {linea.notes}
                   </p>
                 )}
@@ -140,8 +148,8 @@ export default function PedidoDetalle() {
       {avanzar.isError && (
         <p
           role="alert"
-          className="mb-3 rounded-lg bg-[var(--color-cancelado-suave)] px-3 py-2 text-sm
-                     text-[var(--color-cancelado)]"
+          className="mb-3 rounded-lg bg-cancelado-suave px-3 py-2 text-sm
+                     text-cancelado"
         >
           {interpretarError(avanzar.error).mensaje}
         </p>
@@ -165,9 +173,23 @@ export default function PedidoDetalle() {
         </div>
       )}
 
-      {pedido.status === 'delivered' && (
-        <p className="mt-3 text-center text-sm text-piedra-500">
-          Al cerrar se libera la mesa y se descuenta el inventario.
+      {/* Cobrar cierra el pedido por su cuenta, así que se ofrece como camino
+          principal en cuanto hay algo que cobrar y no se ha cobrado ya. */}
+      {!pedido.payment && !['closed', 'cancelled'].includes(pedido.status) && (
+        <Link
+          to={`/pedidos/${pedido.id}/cobrar`}
+          className="mt-3 flex min-h-14 items-center justify-center rounded-xl border-2
+                     border-marca-600 text-base font-semibold text-marca-700
+                     transition hover:bg-marca-50"
+        >
+          Cobrar {dinero(pedido.total, moneda)}
+        </Link>
+      )}
+
+      {pedido.payment && (
+        <p className="mt-3 rounded-xl bg-listo-suave px-4 py-3 text-center text-sm
+                      font-semibold text-listo">
+          Cobrado con {METODOS_PAGO[pedido.payment.method]} · {dinero(pedido.payment.amount, moneda)}
         </p>
       )}
 
@@ -178,7 +200,7 @@ export default function PedidoDetalle() {
           }}
           disabled={avanzar.isPending}
           className="mt-3 min-h-12 w-full rounded-xl border border-piedra-300 font-semibold
-                     text-[var(--color-cancelado)]"
+                     text-cancelado"
         >
           Cancelar pedido
         </button>

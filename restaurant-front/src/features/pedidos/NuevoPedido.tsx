@@ -232,7 +232,7 @@ export default function NuevoPedido() {
                         </p>
                       )}
                       {linea.notas && (
-                        <p className="mt-0.5 text-xs italic text-[var(--color-pendiente)]">
+                        <p className="mt-0.5 text-xs italic text-pendiente">
                           {linea.notas}
                         </p>
                       )}
@@ -255,7 +255,7 @@ export default function NuevoPedido() {
                       onClick={() =>
                         setCarrito((p) => p.filter((l) => l.clave !== linea.clave))
                       }
-                      className="px-2 py-1 text-sm font-medium text-[var(--color-cancelado)]"
+                      className="px-2 py-1 text-sm font-medium text-cancelado"
                     >
                       Quitar
                     </button>
@@ -270,8 +270,8 @@ export default function NuevoPedido() {
           {error && (
             <p
               role="alert"
-              className="mb-3 rounded-lg bg-[var(--color-cancelado-suave)] px-3 py-2 text-sm
-                         text-[var(--color-cancelado)]"
+              className="mb-3 rounded-lg bg-cancelado-suave px-3 py-2 text-sm
+                         text-cancelado"
             >
               {error}
             </p>

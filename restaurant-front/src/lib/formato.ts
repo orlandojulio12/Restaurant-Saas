@@ -36,28 +36,28 @@ export function minutosDesde(iso: string | null): number | null {
 export const ESTADOS: Record<EstadoPedido, { etiqueta: string; clase: string; punto: string }> = {
   pending: {
     etiqueta: 'Pendiente',
-    clase: 'bg-[var(--color-pendiente-suave)] text-[var(--color-pendiente)]',
-    punto: 'bg-[var(--color-pendiente)]',
+    clase: 'bg-pendiente-suave text-pendiente',
+    punto: 'bg-pendiente',
   },
   preparing: {
     etiqueta: 'En preparación',
-    clase: 'bg-[var(--color-preparando-suave)] text-[var(--color-preparando)]',
-    punto: 'bg-[var(--color-preparando)]',
+    clase: 'bg-preparando-suave text-preparando',
+    punto: 'bg-preparando',
   },
   ready: {
     etiqueta: 'Listo',
-    clase: 'bg-[var(--color-listo-suave)] text-[var(--color-listo)]',
-    punto: 'bg-[var(--color-listo)]',
+    clase: 'bg-listo-suave text-listo',
+    punto: 'bg-listo',
   },
   on_the_way: {
     etiqueta: 'En camino',
-    clase: 'bg-[var(--color-camino-suave)] text-[var(--color-camino)]',
-    punto: 'bg-[var(--color-camino)]',
+    clase: 'bg-camino-suave text-camino',
+    punto: 'bg-camino',
   },
   delivered: {
     etiqueta: 'Entregado',
-    clase: 'bg-[var(--color-entregado-suave)] text-[var(--color-entregado)]',
-    punto: 'bg-[var(--color-entregado)]',
+    clase: 'bg-entregado-suave text-entregado',
+    punto: 'bg-entregado',
   },
   closed: {
     etiqueta: 'Cerrado',
@@ -66,8 +66,8 @@ export const ESTADOS: Record<EstadoPedido, { etiqueta: string; clase: string; pu
   },
   cancelled: {
     etiqueta: 'Cancelado',
-    clase: 'bg-[var(--color-cancelado-suave)] text-[var(--color-cancelado)]',
-    punto: 'bg-[var(--color-cancelado)]',
+    clase: 'bg-cancelado-suave text-cancelado',
+    punto: 'bg-cancelado',
   },
 }
 

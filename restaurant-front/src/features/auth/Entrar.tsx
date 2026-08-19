@@ -108,8 +108,8 @@ export default function Entrar() {
         {error && (
           <p
             role="alert"
-            className="rounded-lg bg-[var(--color-cancelado-suave)] px-3 py-2 text-sm
-                       text-[var(--color-cancelado)]"
+            className="rounded-lg bg-cancelado-suave px-3 py-2 text-sm
+                       text-cancelado"
           >
             {error}
           </p>

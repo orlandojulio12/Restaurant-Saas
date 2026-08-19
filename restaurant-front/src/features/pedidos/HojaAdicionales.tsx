@@ -78,8 +78,8 @@ export default function HojaAdicionales({
                 <legend className="mb-2 flex items-center gap-2 text-sm font-semibold text-piedra-800">
                   {grupo.name}
                   {grupo.is_required ? (
-                    <span className="rounded-full bg-[var(--color-pendiente-suave)] px-2 py-0.5
-                                     text-[11px] font-semibold text-[var(--color-pendiente)]">
+                    <span className="rounded-full bg-pendiente-suave px-2 py-0.5
+                                     text-[11px] font-semibold text-pendiente">
                       Obligatorio
                     </span>
                   ) : (
@@ -108,7 +108,7 @@ export default function HojaAdicionales({
                           name={`grupo-${grupo.id}`}
                           checked={marcado}
                           onChange={() => alternar(grupo.id, a.id, unico)}
-                          className="h-5 w-5 accent-[var(--color-marca-600)]"
+                          className="h-5 w-5 accent-marca-600"
                         />
                         <span className="flex-1 text-piedra-800">{a.name}</span>
                         {Number(a.extra_price) > 0 && (

@@ -152,9 +152,9 @@ function Comanda({
   const lenta = espera >= 20 && !urgente
 
   const marco = urgente
-    ? 'border-[var(--color-urgente)] bg-[var(--color-urgente)]/12'
+    ? 'border-urgente bg-urgente/12'
     : lenta
-      ? 'border-[var(--color-atencion)] bg-[var(--color-atencion)]/10'
+      ? 'border-atencion bg-atencion/10'
       : 'border-white/15 bg-white/[0.06]'
 
   return (
@@ -166,9 +166,9 @@ function Comanda({
         <span
           className={`cifras text-lg font-bold ${
             urgente
-              ? 'late-urgente text-[var(--color-urgente)]'
+              ? 'late-urgente text-urgente'
               : lenta
-                ? 'text-[var(--color-atencion)]'
+                ? 'text-atencion'
                 : 'text-white/50'
           }`}
         >
@@ -195,8 +195,8 @@ function Comanda({
             {/* La nota es lo que más se pasa por alto y lo que más devoluciones
                 causa, así que va resaltada y no como texto secundario. */}
             {linea.notes && (
-              <p className="mt-1 ml-1 rounded-md bg-[var(--color-pendiente)]/25 px-2 py-1
-                            text-sm font-semibold text-[var(--color-pendiente-suave)]">
+              <p className="mt-1 ml-1 rounded-md bg-pendiente/25 px-2 py-1
+                            text-sm font-semibold text-pendiente-suave">
                 ⚠ {linea.notes}
               </p>
             )}
@@ -224,9 +224,9 @@ function Comanda({
 
 function Conexion({ estado }: { estado: 'conectando' | 'conectado' | 'caido' }) {
   const pinta = {
-    conectando: { color: 'bg-[var(--color-atencion)]', texto: 'Conectando' },
-    conectado: { color: 'bg-[var(--color-listo)]', texto: 'En vivo' },
-    caido: { color: 'bg-[var(--color-urgente)]', texto: 'Sin conexión' },
+    conectando: { color: 'bg-atencion', texto: 'Conectando' },
+    conectado: { color: 'bg-listo', texto: 'En vivo' },
+    caido: { color: 'bg-urgente', texto: 'Sin conexión' },
   }[estado]
 
   return (

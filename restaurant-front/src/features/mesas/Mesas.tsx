@@ -88,9 +88,9 @@ function TarjetaMesa({ mesa, moneda }: { mesa: Mesa; moneda: string }) {
   const lenta = espera !== null && espera >= 20 && !urgente
 
   const borde = urgente
-    ? 'border-[var(--color-urgente)] ring-2 ring-[var(--color-urgente)]/20'
+    ? 'border-urgente ring-2 ring-urgente/20'
     : lenta
-      ? 'border-[var(--color-atencion)]'
+      ? 'border-atencion'
       : mesa.status === 'occupied'
         ? 'border-marca-300'
         : 'border-piedra-200'
@@ -117,9 +117,9 @@ function TarjetaMesa({ mesa, moneda }: { mesa: Mesa; moneda: string }) {
             <span
               className={`cifras font-semibold ${
                 urgente
-                  ? 'text-[var(--color-urgente)]'
+                  ? 'text-urgente'
                   : lenta
-                    ? 'text-[var(--color-atencion)]'
+                    ? 'text-atencion'
                     : ''
               }`}
             >
@@ -156,7 +156,7 @@ function EstadoMesa({ mesa }: { mesa: Mesa }) {
   const libre = {
     available: { texto: 'Libre', clase: 'bg-piedra-100 text-piedra-600' },
     occupied: { texto: 'Ocupada', clase: 'bg-marca-100 text-marca-800' },
-    reserved: { texto: 'Reservada', clase: 'bg-[var(--color-camino-suave)] text-[var(--color-camino)]' },
+    reserved: { texto: 'Reservada', clase: 'bg-camino-suave text-camino' },
     disabled: { texto: 'Fuera de uso', clase: 'bg-piedra-200 text-piedra-500' },
   }[mesa.status]
 

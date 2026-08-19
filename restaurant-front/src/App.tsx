@@ -5,6 +5,7 @@ import Entrar from './features/auth/Entrar'
 import { useSesion } from './features/auth/SesionContext'
 import Cocina from './features/cocina/Cocina'
 import Mesas from './features/mesas/Mesas'
+import Cobrar from './features/pedidos/Cobrar'
 import NuevoPedido from './features/pedidos/NuevoPedido'
 import PedidoDetalle from './features/pedidos/PedidoDetalle'
 import type { Rol } from './api/tipos'
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/pedidos" element={<EnObra titulo="Pedidos" />} />
           <Route path="/pedidos/nuevo" element={<NuevoPedido />} />
           <Route path="/pedidos/:id" element={<PedidoDetalle />} />
+          <Route path="/pedidos/:id/cobrar" element={<Cobrar />} />
           <Route path="/cocina" element={<Cocina />} />
           <Route path="/menu" element={<EnObra titulo="Menú" />} />
           <Route path="/inventario" element={<EnObra titulo="Inventario" />} />
