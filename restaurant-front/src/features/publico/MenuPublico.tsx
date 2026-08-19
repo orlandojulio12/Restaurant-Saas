@@ -58,7 +58,7 @@ export default function MenuPublico() {
   const [configurando, setConfigurando] = useState<ProductoPub | null>(null)
   const [carritoAbierto, setCarritoAbierto] = useState(false)
   const [notaGeneral, setNotaGeneral] = useState('')
-  const [enviado, setEnviado] = useState<number | null>(null)
+  const [enviado, setEnviado] = useState<{ id: number; propuesta: boolean } | null>(null)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['menu-publico', slug, codigoMesa],
@@ -86,10 +86,10 @@ export default function MenuPublico() {
           additionals: l.adicionales.map((a) => a.id),
         })),
       })
-      return pedido as { id: number }
+      return pedido as { id: number; status: string }
     },
     onSuccess: (pedido) => {
-      setEnviado(pedido.id)
+      setEnviado({ id: pedido.id, propuesta: pedido.status === 'proposed' })
       setCarrito([])
       setCarritoAbierto(false)
     },
@@ -145,17 +145,22 @@ export default function MenuPublico() {
   }
 
   if (enviado) {
+    // Lo que ve el cliente tiene que corresponder con lo que de verdad pasó: si
+    // el restaurante pide confirmación, decirle "ya está en cocina" sería
+    // mentirle y se quedaría esperando comida que nadie ha empezado.
     return (
       <Centrado
-        emoji="✅"
-        titulo="¡Pedido enviado!"
+        emoji={enviado.propuesta ? '🙋' : '✅'}
+        titulo={enviado.propuesta ? '¡Pedido enviado al mesero!' : '¡Pedido enviado!'}
         texto={
-          data.table
-            ? `Ya lo está viendo la cocina. Se lo llevamos a la mesa ${data.table.number}.`
-            : 'Ya lo está viendo la cocina.'
+          enviado.propuesta
+            ? `Pasará por la mesa ${data.table?.number ?? ''} a confirmarlo contigo y de ahí va a cocina. Puedes seguir añadiendo cosas mientras tanto.`
+            : data.table
+              ? `Ya lo está viendo la cocina. Se lo llevamos a la mesa ${data.table.number}.`
+              : 'Ya lo está viendo la cocina.'
         }
       >
-        <p className="cifras mt-4 text-sm text-piedra-400">Pedido #{enviado}</p>
+        <p className="cifras mt-4 text-sm text-piedra-400">Pedido #{enviado.id}</p>
         <button
           onClick={() => setEnviado(null)}
           className="mt-6 min-h-12 rounded-xl bg-marca-600 px-5 font-semibold text-white"

@@ -9,6 +9,18 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
+    /**
+     * Estados en los que el pedido todavía ocupa a alguien.
+     *
+     * Vivía repetida en TableResource y TableController, y al añadir 'proposed'
+     * una de las copias se quedó atrás: la mesa salía ocupada pero sin mostrar
+     * el pedido que el comensal acababa de mandar.
+     */
+    public const ACTIVOS = ['proposed', 'pending', 'preparing', 'ready', 'on_the_way', 'delivered'];
+
+    /** Los que ya no se mueven. */
+    public const TERMINALES = ['closed', 'cancelled'];
+
     protected $fillable = [
         'restaurant_id',
         'table_id',

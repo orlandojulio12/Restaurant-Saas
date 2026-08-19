@@ -204,6 +204,7 @@ export type Ajustes = {
     tax_percent: number
     print_kitchen: boolean
     notify_sound: boolean
+    qr_confirm: boolean
   }
 }
 

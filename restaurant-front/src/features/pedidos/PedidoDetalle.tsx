@@ -16,6 +16,7 @@ import { useSesion } from '../auth/SesionContext'
 
 /** Qué palabra usar para cada avance, desde el punto de vista de quien pulsa. */
 const ACCION: Record<EstadoPedido, string> = {
+  proposed: 'Confirmar y enviar a cocina',
   pending: 'Empezar a preparar',
   preparing: 'Marcar listo',
   ready: 'Entregar',
@@ -97,6 +98,13 @@ export default function PedidoDetalle() {
             {estado.etiqueta}
           </span>
         </div>
+
+        {pedido.status === 'proposed' && (
+          <p className="mt-3 rounded-lg bg-camino-suave px-3 py-2 text-sm text-camino">
+            Lo armó el cliente desde el QR de la mesa. Revísalo con él y confírmalo para que
+            baje a cocina.
+          </p>
+        )}
 
         {pedido.delivery_address && (
           <p className="mt-3 text-sm text-piedra-600">📍 {pedido.delivery_address}</p>

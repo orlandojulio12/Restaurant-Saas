@@ -23,6 +23,8 @@ class SettingsController extends Controller
         'tax_percent'   => 'float',
         'print_kitchen' => 'bool',
         'notify_sound'  => 'bool',
+        // Si el pedido del QR pasa por el mesero antes de bajar a cocina.
+        'qr_confirm'    => 'bool',
     ];
 
     private const DEFAULTS = [
@@ -30,6 +32,9 @@ class SettingsController extends Controller
         'tax_percent'   => 0,
         'print_kitchen' => true,
         'notify_sound'  => true,
+        // Activado por defecto: que un desconocido mande comanda directa a
+        // cocina debe ser una decisión consciente del restaurante.
+        'qr_confirm'    => true,
     ];
 
     public function __construct(private readonly ImageService $images) {}
@@ -71,6 +76,7 @@ class SettingsController extends Controller
             'settings.tax_percent'     => ['nullable', 'numeric', 'min:0', 'max:100'],
             'settings.print_kitchen'   => ['nullable', 'boolean'],
             'settings.notify_sound'    => ['nullable', 'boolean'],
+            'settings.qr_confirm'      => ['nullable', 'boolean'],
         ]);
 
         DB::transaction(function () use ($data, $request, $restaurant) {

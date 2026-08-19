@@ -8,6 +8,7 @@ use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Restaurant;
+use App\Models\RestaurantSetting;
 use App\Models\RestaurantTable;
 use App\Services\OrderService;
 use App\Services\PlanService;
@@ -24,6 +25,8 @@ class OrderController extends Controller
 
     // Transiciones de estado válidas
     private const TRANSITIONS = [
+        // El comensal propone desde el QR; el mesero confirma o descarta.
+        'proposed'   => ['pending',   'cancelled'],
         'pending'    => ['preparing', 'cancelled'],
         'preparing'  => ['ready',     'cancelled'],
         'ready'      => ['delivered', 'on_the_way'],
@@ -35,12 +38,13 @@ class OrderController extends Controller
 
     // Timestamp que se actualiza en cada transición
     private const STATUS_TIMESTAMPS = [
+        // Confirmar una propuesta es lo único que entra en 'pending'.
+        'pending'    => 'confirmed_at',
         'preparing'  => 'preparing_at',
         'ready'      => 'ready_at',
         'delivered'  => 'delivered_at',
         'on_the_way' => 'delivered_at',
         'closed'     => 'closed_at',
-        'confirmed'  => 'confirmed_at',
     ];
 
     public function index(Request $request): JsonResponse
@@ -227,11 +231,23 @@ class OrderController extends Controller
             return $error;
         }
 
+        // Opcional por restaurante: con la confirmación activada el pedido
+        // llega al mesero como propuesta en vez de bajar solo a cocina. Evita
+        // que cualquiera sentado en la mesa mande comanda sin que nadie mire.
+        $requiereConfirmacion = RestaurantSetting::where('restaurant_id', $restaurant->id)
+            ->where('key_name', 'qr_confirm')
+            ->value('value');
+
+        $estado = filter_var($requiereConfirmacion ?? '1', FILTER_VALIDATE_BOOL)
+            ? 'proposed'
+            : 'pending';
+
         $order = $this->orders->create(
             $data,
             $restaurant->id,
             null,
             $this->productosDelRestaurante($data, $restaurant->id),
+            $estado,
         );
 
         return response()->json(new OrderResource($order), 201);

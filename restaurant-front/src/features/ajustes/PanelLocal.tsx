@@ -129,6 +129,13 @@ export default function PanelLocal() {
           />
 
           <Interruptor
+            etiqueta="El mesero confirma los pedidos del QR"
+            ayuda="Si lo apagas, lo que pida el cliente baja directo a cocina"
+            activo={ajustes.qr_confirm}
+            onCambio={(v) => setAjustes({ ...ajustes, qr_confirm: v })}
+          />
+
+          <Interruptor
             etiqueta="Imprimir comanda en cocina"
             activo={ajustes.print_kitchen}
             onCambio={(v) => setAjustes({ ...ajustes, print_kitchen: v })}

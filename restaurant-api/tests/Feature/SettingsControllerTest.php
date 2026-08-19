@@ -119,7 +119,7 @@ class SettingsControllerTest extends TestCase
     {
         $this->putJson('/api/settings', ['settings' => ['color_favorito' => 'azul']])
             ->assertStatus(422)
-            ->assertJsonPath('allowed', ['mode', 'tax_percent', 'print_kitchen', 'notify_sound']);
+            ->assertJsonPath('allowed', ['mode', 'tax_percent', 'print_kitchen', 'notify_sound', 'qr_confirm']);
 
         $this->assertDatabaseMissing('restaurant_settings', ['key_name' => 'color_favorito']);
     }

@@ -118,7 +118,9 @@ class MenuPublicoTest extends TestCase
         ])->assertCreated();
 
         $this->assertSame('dine_in', $response->json('type'));
-        $this->assertSame('pending', $response->json('status'));
+        // Nace como propuesta: el mesero lo confirma antes de que baje a cocina
+        // (ver PropuestaQrTest).
+        $this->assertSame('proposed', $response->json('status'));
         $this->assertEquals(50000, $response->json('total'));
 
         $pedido = Order::first();

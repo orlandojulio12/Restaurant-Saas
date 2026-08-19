@@ -20,8 +20,12 @@ class OrderCreated implements ShouldBroadcast
 
     public function broadcastOn(): array
     {
+        // Una propuesta del comensal todavía no es trabajo para cocina: va al
+        // mesero, que es quien la confirma al pasar por la mesa.
+        $destino = $this->order->status === 'proposed' ? 'waiters' : 'kitchen';
+
         return [
-            new PrivateChannel("restaurant.{$this->order->restaurant_id}.kitchen"),
+            new PrivateChannel("restaurant.{$this->order->restaurant_id}.{$destino}"),
         ];
     }
 
@@ -35,6 +39,7 @@ class OrderCreated implements ShouldBroadcast
         return [
             'order_id'     => $this->order->id,
             'type'         => $this->order->type,
+            'proposed'     => $this->order->status === 'proposed',
             'status'       => $this->order->status,
             'table_id'     => $this->order->table_id,
             'table_number' => $this->order->table?->number,

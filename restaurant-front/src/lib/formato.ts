@@ -34,6 +34,11 @@ export function minutosDesde(iso: string | null): number | null {
 }
 
 export const ESTADOS: Record<EstadoPedido, { etiqueta: string; clase: string; punto: string }> = {
+  proposed: {
+    etiqueta: 'Por confirmar',
+    clase: 'bg-camino-suave text-camino',
+    punto: 'bg-camino',
+  },
   pending: {
     etiqueta: 'Pendiente',
     clase: 'bg-pendiente-suave text-pendiente',
@@ -94,6 +99,7 @@ export const METODOS_PAGO: Record<MetodoPago, string> = {
  * van a devolver 422.
  */
 export const SIGUIENTES: Record<EstadoPedido, EstadoPedido[]> = {
+  proposed: ['pending', 'cancelled'],
   pending: ['preparing', 'cancelled'],
   preparing: ['ready', 'cancelled'],
   ready: ['delivered', 'on_the_way'],

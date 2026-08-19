@@ -27,9 +27,14 @@ class OrderService
      * @param  array  $data          Datos ya validados
      * @param  Product[]|Collection  $products  Productos del restaurante, indexados por id
      */
-    public function create(array $data, int $restaurantId, ?int $userId, Collection $products): Order
-    {
-        $order = DB::transaction(function () use ($data, $restaurantId, $userId, $products) {
+    public function create(
+        array $data,
+        int $restaurantId,
+        ?int $userId,
+        Collection $products,
+        string $status = 'pending',
+    ): Order {
+        $order = DB::transaction(function () use ($data, $restaurantId, $userId, $products, $status) {
             $subtotal = 0;
 
             $order = Order::create([
@@ -39,7 +44,7 @@ class OrderService
                 // Null en los pedidos por QR: no hay usuario autenticado detrás.
                 'user_id'          => $userId,
                 'type'             => $data['type'],
-                'status'           => 'pending',
+                'status'           => $status,
                 'delivery_address' => $data['delivery_address'] ?? null,
                 'delivery_notes'   => $data['delivery_notes'] ?? null,
                 'notes'            => $data['notes'] ?? null,

@@ -87,13 +87,19 @@ function TarjetaMesa({ mesa, moneda }: { mesa: Mesa; moneda: string }) {
   const urgente = espera !== null && espera >= 35
   const lenta = espera !== null && espera >= 20 && !urgente
 
-  const borde = urgente
-    ? 'border-urgente ring-2 ring-urgente/20'
-    : lenta
-      ? 'border-atencion'
-      : mesa.status === 'occupied'
-        ? 'border-marca-300'
-        : 'border-piedra-200'
+  // Una propuesta sin confirmar manda sobre el reloj: es lo único de esta
+  // pantalla que espera a que el mesero haga algo.
+  const porConfirmar = pedido?.status === 'proposed'
+
+  const borde = porConfirmar
+    ? 'border-camino ring-2 ring-camino/25'
+    : urgente
+      ? 'border-urgente ring-2 ring-urgente/20'
+      : lenta
+        ? 'border-atencion'
+        : mesa.status === 'occupied'
+          ? 'border-marca-300'
+          : 'border-piedra-200'
 
   return (
     <Link
@@ -111,6 +117,11 @@ function TarjetaMesa({ mesa, moneda }: { mesa: Mesa; moneda: string }) {
           <p className="cifras text-sm font-semibold text-piedra-800">
             {dinero(pedido.total, moneda)}
           </p>
+          {porConfirmar && (
+            <p className="mt-0.5 text-xs font-semibold text-camino">
+              El cliente ya pidió · confirma
+            </p>
+          )}
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-piedra-500">
             <span className="cifras">{pedido.items_count} art.</span>
             <span aria-hidden>·</span>

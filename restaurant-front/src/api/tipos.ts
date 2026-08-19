@@ -3,6 +3,8 @@
 export type Rol = 'admin' | 'waiter' | 'kitchen' | 'cashier'
 
 export type EstadoPedido =
+  /** Lo armó el comensal desde el QR y espera que el mesero lo confirme. */
+  | 'proposed'
   | 'pending'
   | 'preparing'
   | 'ready'

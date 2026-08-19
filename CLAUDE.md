@@ -153,6 +153,7 @@ Definida como constante `TRANSITIONS` en `OrderController`; toda transición inv
 devuelve 422 con la lista de estados permitidos.
 
 ```
+proposed    → pending | cancelled
 pending     → preparing | cancelled
 preparing   → ready | cancelled
 ready       → delivered | on_the_way
@@ -160,6 +161,16 @@ on_the_way  → delivered
 delivered   → closed
 closed, cancelled → (terminales)
 ```
+
+`proposed` es el pedido que arma el comensal desde el QR de la mesa: no baja a
+cocina hasta que el mesero lo confirma, y confirmarlo sella `confirmed_at`. Es
+opcional por restaurante (ajuste `qr_confirm`, activado por defecto): apagado,
+el pedido del QR nace directamente en `pending`. `OrderCreated` enruta según el
+estado — una propuesta va al canal `.waiters`, no a `.kitchen`.
+
+**La lista de estados activos vive en `Order::ACTIVOS`.** Estaba duplicada en
+`TableResource` y `TableController`, y al añadir `proposed` una copia se quedó
+atrás: la mesa salía ocupada pero sin mostrar el pedido recién llegado.
 
 Cada transición estampa su timestamp (`preparing_at`, `ready_at`, `delivered_at`, `closed_at`).
 Al pasar a `closed`: si no quedan pedidos activos en la mesa, la mesa vuelve a `available`

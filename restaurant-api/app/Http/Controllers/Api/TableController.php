@@ -105,7 +105,7 @@ class TableController extends Controller
 
         $orders = Order::with(['items.additionals', 'user'])
             ->where('table_id', $table->id)
-            ->whereIn('status', ['pending', 'preparing', 'ready', 'delivered'])
+            ->whereIn('status', Order::ACTIVOS)
             ->latest()
             ->get();
 
