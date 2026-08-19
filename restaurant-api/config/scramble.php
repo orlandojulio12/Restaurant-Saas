@@ -72,7 +72,12 @@ MD,
         'title' => 'Restaurante Dinámico · API',
     ],
 
-    'renderer' => 'elements',
+    /*
+     * Scalar en vez de Stoplight Elements: Scramble genera OpenAPI 3.1 y
+     * Elements 8.4.2 no lo digiere — pintaba la portada y los esquemas, pero
+     * dejaba fuera los 77 endpoints.
+     */
+    'renderer' => 'scalar',
 
     'renderers' => [
         /*
@@ -93,7 +98,9 @@ MD,
          */
         'scalar' => [
             'view' => 'scramble::scalar',
-            'cdn' => 'https://cdn.jsdelivr.net/npm/@scalar/api-reference',
+            // Servido desde el proyecto: con el CDN, un bloqueador de anuncios
+            // o trabajar sin conexión dejaban la página en blanco.
+            'cdn' => '/vendor/scramble/scalar.js',
             'theme' => 'laravel',
             'proxyUrl' => 'https://proxy.scalar.com',
             'darkMode' => false,
