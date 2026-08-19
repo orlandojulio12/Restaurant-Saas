@@ -1,0 +1,143 @@
+@import 'tailwindcss';
+
+/*
+  Sistema visual de Restaurante Dinámico.
+
+  Las decisiones salen de dónde se usa cada pantalla, no de un gusto estético:
+  el mozo va de pie con una mano ocupada, la cocina mira una tablet a dos metros
+  con las manos sucias, y el dueño revisa cifras sentado. Por eso los estados
+  se distinguen por color *y* forma *y* texto, los objetivos táctiles son
+  grandes, y los números van en cifras de ancho fijo para que las columnas de
+  precios se lean de un vistazo.
+*/
+
+@theme {
+  /* ── Marca ────────────────────────────────────────────────────────────────
+     Verde azulado profundo. Se aleja del naranja de restaurante de siempre y
+     mantiene el contraste sobre fondo claro y oscuro sin cambiar de tono. */
+  --color-marca-50: #eefbf6;
+  --color-marca-100: #d3f5e7;
+  --color-marca-200: #aae9d3;
+  --color-marca-300: #72d7ba;
+  --color-marca-400: #3cbd9d;
+  --color-marca-500: #1a9f83;
+  --color-marca-600: #0f806b;
+  --color-marca-700: #0e6657;
+  --color-marca-800: #105146;
+  --color-marca-900: #10433b;
+  --color-marca-950: #032622;
+
+  /* ── Neutros cálidos ──────────────────────────────────────────────────────
+     Con una pizca de amarillo: un gris puro deja la interfaz con aire de
+     hospital, y esto es un sitio donde se come. */
+  --color-piedra-50: #faf9f7;
+  --color-piedra-100: #f3f1ed;
+  --color-piedra-200: #e7e3dc;
+  --color-piedra-300: #d5cfc4;
+  --color-piedra-400: #b0a99b;
+  --color-piedra-500: #8b8274;
+  --color-piedra-600: #6f675b;
+  --color-piedra-700: #575047;
+  --color-piedra-800: #3b352f;
+  --color-piedra-900: #262220;
+  --color-piedra-950: #171412;
+
+  /* ── Estados del pedido ───────────────────────────────────────────────────
+     Un color por estado, todos distinguibles entre sí también en escala de
+     grises. El verde queda para "listo" porque es el único que exige que
+     alguien se levante a recogerlo. */
+  --color-pendiente: #b45309;
+  --color-pendiente-suave: #fef3c7;
+  --color-preparando: #1d4ed8;
+  --color-preparando-suave: #dbeafe;
+  --color-listo: #15803d;
+  --color-listo-suave: #dcfce7;
+  --color-camino: #6d28d9;
+  --color-camino-suave: #ede9fe;
+  --color-entregado: #475569;
+  --color-entregado-suave: #e2e8f0;
+  --color-cancelado: #be123c;
+  --color-cancelado-suave: #ffe4e6;
+
+  /* ── Urgencia ─────────────────────────────────────────────────────────────
+     La cocina necesita ver *cuánto lleva esperando* un pedido antes de leer
+     nada. Estos tonos tiñen la tarjeta entera. */
+  --color-urgente: #dc2626;
+  --color-atencion: #ea580c;
+
+  /* ── Tipografía ───────────────────────────────────────────────────────────
+     Pila del sistema a propósito: en tablets de gama baja y conexiones malas
+     una fuente web es un retraso visible al abrir, y aquí abrir rápido importa
+     más que un logotipo bonito. */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  /* Escala tipográfica: pasos amplios para que la jerarquía se note de lejos. */
+  --text-cifra: 2.25rem;
+  --text-cifra--line-height: 1.1;
+  --text-cifra--font-weight: 700;
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
+
+:root {
+  --superficie: var(--color-piedra-50);
+  --superficie-elevada: #ffffff;
+  --borde: var(--color-piedra-200);
+  --texto: var(--color-piedra-900);
+  --texto-suave: var(--color-piedra-600);
+}
+
+html {
+  /* Evita el zoom accidental al tocar dos veces en tablet. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--superficie);
+  color: var(--texto);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Los números que se comparan en columna —precios, tiempos, totales— van en
+   ancho fijo para que las cifras queden alineadas verticalmente. */
+.cifras {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Foco visible siempre: se navega con teclado en caja y con lector en admin. */
+:focus-visible {
+  outline: 2px solid var(--color-marca-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respeta a quien pidió menos movimiento en su sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Pulso para lo que lleva demasiado tiempo esperando en cocina. */
+@keyframes latido {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.late-urgente {
+  animation: latido 1.6s ease-in-out infinite;
+}

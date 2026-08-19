@@ -26,8 +26,10 @@ class TableResource extends JsonResource
                 'status'      => $active->status,
                 'total'       => $active->total,
                 'items_count' => $active->items_count ?? $active->items->count(),
+                // Del pasado hacia ahora: al revés, Carbon 3 devuelve el
+                // valor en negativo y el panel muestra "-48 min".
                 'elapsed_min' => $active->created_at
-                    ? (int) now()->diffInMinutes($active->created_at)
+                    ? (int) $active->created_at->diffInMinutes(now())
                     : null,
             ];
         });
