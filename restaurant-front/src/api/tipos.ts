@@ -167,11 +167,23 @@ export type Pedido = {
   payment?: { id: number; method: MetodoPago; amount: string; status: string } | null
 }
 
-/** Respuesta paginada estándar de Laravel. */
-export type Paginado<T> = {
-  data: T[]
+/**
+ * Paginación de Laravel. Hay dos formas según cómo responda el endpoint:
+ * los que devuelven un Resource envuelven los contadores en `meta`, y los que
+ * paginan el modelo directo los ponen en la raíz.
+ */
+export type Contadores = {
   current_page: number
   last_page: number
   per_page: number
   total: number
 }
+
+/** Colección de Resources: /orders. */
+export type PaginadoResource<T> = {
+  data: T[]
+  meta: Contadores
+}
+
+/** Paginación directa del modelo: /inventory/movements. */
+export type Paginado<T> = { data: T[] } & Contadores

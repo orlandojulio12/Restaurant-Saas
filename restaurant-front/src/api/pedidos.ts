@@ -1,5 +1,13 @@
 import { api } from './client'
-import type { Categoria, EstadoPedido, Mesa, Paginado, Pedido, Producto, TipoPedido } from './tipos'
+import type {
+  Categoria,
+  EstadoPedido,
+  Mesa,
+  PaginadoResource,
+  Pedido,
+  Producto,
+  TipoPedido,
+} from './tipos'
 
 /** Una línea del carrito, antes de convertirse en pedido. */
 export type LineaCarrito = {
@@ -40,8 +48,16 @@ export const pedidosApi = {
 
   ver: async (id: number) => (await api.get<Pedido>(`/orders/${id}`)).data,
 
-  listar: async (params: { status?: EstadoPedido; per_page?: number } = {}) =>
-    (await api.get<Paginado<Pedido>>('/orders', { params })).data,
+  listar: async (
+    params: {
+      status?: EstadoPedido
+      type?: string
+      table_id?: number
+      date?: string
+      page?: number
+      per_page?: number
+    } = {},
+  ) => (await api.get<PaginadoResource<Pedido>>('/orders', { params })).data,
 
   cambiarEstado: async (id: number, status: EstadoPedido) =>
     (await api.patch<Pedido>(`/orders/${id}/status`, { status })).data,
