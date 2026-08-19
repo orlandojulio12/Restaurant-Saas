@@ -160,7 +160,7 @@ export default function MenuPublico() {
               : 'Ya lo está viendo la cocina.'
         }
       >
-        <p className="cifras mt-4 text-sm text-piedra-400">Pedido #{enviado.id}</p>
+        <p className="cifras mt-4 text-sm text-piedra-500">Pedido #{enviado.id}</p>
         <button
           onClick={() => setEnviado(null)}
           className="mt-6 min-h-12 rounded-xl bg-marca-600 px-5 font-semibold text-white"
@@ -223,8 +223,8 @@ export default function MenuPublico() {
                           : agregar(producto, [], '', 1)
                       }}
                       disabled={sinMesa}
-                      className="flex w-full items-center gap-3 rounded-2xl border border-piedra-200
-                                 bg-white p-3 text-left transition hover:border-marca-300
+                      className="alzado flex w-full items-center gap-3 rounded-2xl border border-piedra-200
+                                 bg-white p-3 text-left hover:border-marca-300
                                  disabled:opacity-60"
                     >
                       {producto.image_url && (
@@ -349,7 +349,7 @@ function HojaProducto({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-2xl bg-white sm:rounded-2xl">
+      <div className="flex max-h-[92dvh] w-full max-w-lg flex-col flotante rounded-t-2xl bg-white sm:rounded-2xl">
         <header className="border-b border-piedra-200 px-5 py-4">
           <h2 className="text-lg font-bold text-piedra-900">{producto.name}</h2>
           {producto.description && (
@@ -423,7 +423,7 @@ function HojaProducto({
 
           <label className="flex flex-col gap-1.5">
             <span className="font-semibold text-piedra-800">
-              ¿Algo especial? <span className="font-normal text-piedra-400">(opcional)</span>
+              ¿Algo especial? <span className="font-normal text-piedra-500">(opcional)</span>
             </span>
             <textarea
               value={notas}
@@ -531,7 +531,7 @@ function HojaCarrito({
 
         <label className="mt-5 flex flex-col gap-1.5">
           <span className="font-semibold text-piedra-800">
-            Nota para la cocina <span className="font-normal text-piedra-400">(opcional)</span>
+            Nota para la cocina <span className="font-normal text-piedra-500">(opcional)</span>
           </span>
           <textarea
             value={nota}
@@ -565,7 +565,7 @@ function HojaCarrito({
           {enviando ? 'Enviando…' : 'Enviar a cocina'}
         </button>
 
-        <p className="mt-2 text-center text-xs text-piedra-400">
+        <p className="mt-2 text-center text-xs text-piedra-500">
           Se paga al final, con el personal.
         </p>
       </footer>

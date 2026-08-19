@@ -35,7 +35,10 @@
   --color-piedra-200: #e7e3dc;
   --color-piedra-300: #d5cfc4;
   --color-piedra-400: #b0a99b;
-  --color-piedra-500: #8b8274;
+  /* Oscurecido de #8b8274. El texto secundario se lee tanto sobre blanco como
+     sobre el fondo de pagina, que es algo mas oscuro: con el original daba 3.79
+     y no llegaba al 4.5 de WCAG AA en ninguno de los dos. */
+  --color-piedra-500: #7a7265;
   --color-piedra-600: #6f675b;
   --color-piedra-700: #575047;
   --color-piedra-800: #3b352f;
@@ -63,20 +66,54 @@
      La cocina necesita ver *cuánto lleva esperando* un pedido antes de leer
      nada. Estos tonos tiñen la tarjeta entera. */
   --color-urgente: #dc2626;
-  --color-atencion: #ea580c;
+  /* Igual que el gris: el naranja original daba 3.56 sobre blanco y se usa
+     para el aviso de "esto lleva esperando", que hay que poder leer. */
+  --color-atencion: #cc4d0a;
 
   /* ── Tipografía ───────────────────────────────────────────────────────────
-     Pila del sistema a propósito: en tablets de gama baja y conexiones malas
-     una fuente web es un retraso visible al abrir, y aquí abrir rápido importa
-     más que un logotipo bonito. */
+     Dos familias con papeles distintos.
+
+     El texto de interfaz sigue en la pila del sistema: es la que ya está en el
+     dispositivo, se pinta sin esperar a descargar nada y en una tablet de gama
+     baja eso se nota al abrir.
+
+     Los titulares y las cifras usan Bricolage Grotesque, alojada aquí mismo
+     (76 KB, un solo archivo variable para todos los pesos). Es ligeramente
+     condensada, así que un total largo cabe sin encogerlo, y tiene carácter
+     suficiente para que la app no parezca una hoja de cálculo. */
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
     Arial, sans-serif;
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
 
-  /* Escala tipográfica: pasos amplios para que la jerarquía se note de lejos. */
+  /* Escala con saltos amplios: la jerarquía tiene que leerse de lejos, no
+     adivinarse comparando dos tamaños casi iguales. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.3;
   --text-cifra: 2.25rem;
-  --text-cifra--line-height: 1.1;
+  --text-cifra--line-height: 1;
   --text-cifra--font-weight: 700;
+  --text-titular: 1.75rem;
+  --text-titular--line-height: 1.15;
+  --text-titular--font-weight: 700;
+
+  /* ── Elevación ────────────────────────────────────────────────────────────
+     Tres niveles con significado, no decoración: plano para lo que solo
+     contiene, alzado para lo que responde al toque, flotante para lo que tapa
+     el resto de la pantalla. */
+  --shadow-alzado: 0 1px 2px rgb(23 20 18 / 0.04), 0 2px 8px rgb(23 20 18 / 0.05);
+  --shadow-alzado-activo: 0 2px 4px rgb(23 20 18 / 0.06), 0 8px 20px rgb(23 20 18 / 0.09);
+  --shadow-flotante: 0 -4px 24px rgb(23 20 18 / 0.12), 0 12px 40px rgb(23 20 18 / 0.18);
+}
+
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('/fuentes/bricolage-latin.woff2') format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  /* El texto se pinta ya con la fuente del sistema y cambia al llegar esta:
+     más vale un salto tipográfico que una pantalla en blanco. */
+  font-display: swap;
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────── */
@@ -102,18 +139,63 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Titulares con la fuente de display. Se aplica por elemento en vez de clase
+   por clase: así toda la app sube de nivel de una vez y no hay pantallas que
+   se queden atrás cuando se añadan. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  /* Una condensada apretada gana cohesión con el tracking algo cerrado. */
+  letter-spacing: -0.021em;
+}
+
 /* Los números que se comparan en columna —precios, tiempos, totales— van en
-   ancho fijo para que las cifras queden alineadas verticalmente. */
+   ancho fijo para que las cifras queden alineadas verticalmente, y en la
+   familia de display, que les da peso sin subir el tamaño. */
 .cifras {
+  font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
+  letter-spacing: -0.01em;
 }
 
 /* Foco visible siempre: se navega con teclado en caja y con lector en admin. */
 :focus-visible {
   outline: 2px solid var(--color-marca-500);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
+}
+
+/* La selección hereda la marca en vez del azul del navegador. */
+::selection {
+  background: var(--color-marca-200);
+  color: var(--color-marca-950);
+}
+
+/* ── Superficies ───────────────────────────────────────────────────────────
+   Las tarjetas sobre las que se toca llevan sombra y responden; las que solo
+   agrupan información se quedan planas. La diferencia le dice al ojo qué es
+   accionable antes de leer nada. */
+.alzado {
+  box-shadow: var(--shadow-alzado);
+  transition:
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.alzado:hover {
+  box-shadow: var(--shadow-alzado-activo);
+}
+
+/* Realimentación al tocar: en una pantalla táctil no hay cursor que confirme
+   que el dedo acertó. */
+.alzado:active {
+  transform: scale(0.99);
+}
+
+.flotante {
+  box-shadow: var(--shadow-flotante);
 }
 
 /* Respeta a quien pidió menos movimiento en su sistema. */

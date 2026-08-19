@@ -151,12 +151,12 @@ export default function Finanzas() {
             <ul className="flex flex-col gap-1.5">
               {costos.data!.data.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
-                  <span className={c.is_active ? 'text-piedra-800' : 'text-piedra-400 line-through'}>
+                  <span className={c.is_active ? 'text-piedra-800' : 'text-piedra-500 line-through'}>
                     {c.name}
                   </span>
                   <span className="cifras shrink-0 text-piedra-600">
                     {dinero(c.amount, moneda)}
-                    <span className="ml-1 text-xs text-piedra-400">/{FRECUENCIA[c.frequency] ?? c.frequency}</span>
+                    <span className="ml-1 text-xs text-piedra-500">/{FRECUENCIA[c.frequency] ?? c.frequency}</span>
                   </span>
                 </li>
               ))}
@@ -293,7 +293,7 @@ function Dato({
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-piedra-600">
         {etiqueta}
-        {ayuda && <span className="block text-xs text-piedra-400">{ayuda}</span>}
+        {ayuda && <span className="block text-xs text-piedra-500">{ayuda}</span>}
       </dt>
       <dd
         className={`cifras shrink-0 ${

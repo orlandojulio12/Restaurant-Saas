@@ -276,7 +276,7 @@ function ListaProductos({
             </button>
             <button
               onClick={() => onBorrar(p)}
-              className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
+              className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-500
                          hover:bg-cancelado-suave hover:text-cancelado"
             >
               Eliminar
@@ -343,7 +343,7 @@ function ListaCategorias({
           </button>
           <button
             onClick={() => onBorrar(c)}
-            className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
+            className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-500
                        hover:bg-cancelado-suave hover:text-cancelado"
           >
             Eliminar
@@ -402,7 +402,7 @@ function ListaGrupos({
               </button>
               <button
                 onClick={() => onBorrar(g)}
-                className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
+                className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-500
                            hover:bg-cancelado-suave hover:text-cancelado"
               >
                 Eliminar
@@ -417,7 +417,7 @@ function ListaGrupos({
                 className={`cifras min-h-11 rounded-lg px-3 text-xs ${
                   a.is_available
                     ? 'bg-piedra-100 text-piedra-700'
-                    : 'bg-piedra-100 text-piedra-400 line-through'
+                    : 'bg-piedra-100 text-piedra-500 line-through'
                 }`}
               >
                 {a.name}
@@ -425,7 +425,7 @@ function ListaGrupos({
               </li>
             ))}
             {g.additionals.length === 0 && (
-              <li className="text-xs text-piedra-400">Sin opciones todavía.</li>
+              <li className="text-xs text-piedra-500">Sin opciones todavía.</li>
             )}
           </ul>
         </li>

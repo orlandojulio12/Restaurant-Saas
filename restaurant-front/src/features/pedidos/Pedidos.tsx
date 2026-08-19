@@ -151,7 +151,7 @@ export default function Pedidos() {
         <section key={dia} className="mb-5">
           <h2 className="mb-2 px-1 text-sm font-semibold text-piedra-500">
             {etiquetaDia(delDia[0].created_at)}
-            <span className="cifras ml-2 font-normal text-piedra-400">
+            <span className="cifras ml-2 font-normal text-piedra-500">
               {delDia.length} pedido{delDia.length === 1 ? '' : 's'}
             </span>
           </h2>
@@ -247,7 +247,7 @@ function FilaPedido({ pedido, moneda }: { pedido: Pedido; moneda: string }) {
             a qué hora fue. */}
         <p
           className={`cifras text-xs ${
-            urgente ? 'font-semibold text-urgente' : lenta ? 'font-semibold text-atencion' : 'text-piedra-400'
+            urgente ? 'font-semibold text-urgente' : lenta ? 'font-semibold text-atencion' : 'text-piedra-500'
           }`}
         >
           {abierto ? transcurrido(espera) : hora(pedido.created_at)}

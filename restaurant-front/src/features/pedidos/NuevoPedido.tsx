@@ -216,7 +216,7 @@ export default function NuevoPedido() {
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {carrito.length === 0 ? (
-            <p className="mt-8 text-center text-sm text-piedra-400">
+            <p className="mt-8 text-center text-sm text-piedra-500">
               Toca un producto para empezar.
             </p>
           ) : (
@@ -453,7 +453,7 @@ function BotonProducto({
           <span className="text-xs font-semibold text-piedra-500">Agotado</span>
         ) : (
           (producto.additional_groups ?? []).length > 0 && (
-            <span className="text-xs text-piedra-400">opciones</span>
+            <span className="text-xs text-piedra-500">opciones</span>
           )
         )}
       </span>

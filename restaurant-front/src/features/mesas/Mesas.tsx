@@ -104,8 +104,8 @@ function TarjetaMesa({ mesa, moneda }: { mesa: Mesa; moneda: string }) {
   return (
     <Link
       to={pedido ? `/pedidos/${pedido.id}` : `/pedidos/nuevo?mesa=${mesa.id}`}
-      className={`flex min-h-32 flex-col justify-between rounded-2xl border-2 bg-white p-3.5
-                  transition hover:shadow-md ${borde}`}
+      className={`alzado flex min-h-32 flex-col justify-between rounded-2xl border-2
+                  bg-white p-3.5 ${borde}`}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-xl font-bold text-piedra-900">{mesa.number}</span>
@@ -139,7 +139,7 @@ function TarjetaMesa({ mesa, moneda }: { mesa: Mesa; moneda: string }) {
           </p>
         </div>
       ) : (
-        <p className="mt-2 text-xs text-piedra-400">
+        <p className="mt-2 text-xs text-piedra-500">
           {mesa.capacity} puestos · toca para pedir
         </p>
       )}

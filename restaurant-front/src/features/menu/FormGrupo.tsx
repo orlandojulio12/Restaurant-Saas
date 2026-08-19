@@ -165,7 +165,7 @@ export default function FormGrupo({
               className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg ${
                 l.is_available
                   ? 'bg-listo-suave text-listo'
-                  : 'bg-piedra-100 text-piedra-400'
+                  : 'bg-piedra-100 text-piedra-500'
               }`}
             >
               {l.is_available ? '✓' : '✕'}
@@ -174,7 +174,7 @@ export default function FormGrupo({
               onClick={() => setLineas((p) => p.filter((_, j) => j !== i))}
               aria-label="Quitar opción"
               className="flex h-12 w-10 shrink-0 items-center justify-center rounded-xl
-                         text-piedra-400 hover:bg-cancelado-suave hover:text-cancelado"
+                         text-piedra-500 hover:bg-cancelado-suave hover:text-cancelado"
             >
               −
             </button>

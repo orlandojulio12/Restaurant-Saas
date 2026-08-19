@@ -236,7 +236,7 @@ export default function Inventario() {
                       onClick={() => {
                         if (confirm(`¿Eliminar "${i.name}"?`)) borrar.mutate(i.id)
                       }}
-                      className="min-h-11 rounded-xl px-3 text-sm font-medium text-piedra-400
+                      className="min-h-11 rounded-xl px-3 text-sm font-medium text-piedra-500
                                  hover:bg-cancelado-suave hover:text-cancelado"
                     >
                       Eliminar
@@ -335,7 +335,7 @@ function ListaMovimientos({
                 {delta > 0 ? '+' : ''}
                 {delta.toFixed(3).replace(/\.?0+$/, '')} {m.ingredient?.unit}
               </p>
-              <p className="cifras text-xs text-piedra-400">
+              <p className="cifras text-xs text-piedra-500">
                 {Number(m.stock_before)} → {Number(m.stock_after)}
               </p>
             </div>

@@ -37,7 +37,7 @@ export function Hoja({
       <div
         role="dialog"
         aria-label={titulo}
-        className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-2xl bg-white sm:rounded-2xl"
+        className="flex max-h-[92dvh] w-full max-w-lg flex-col flotante rounded-t-2xl bg-white sm:rounded-2xl"
       >
         <header className="border-b border-piedra-200 px-5 py-4">
           <h2 className="text-lg font-bold text-piedra-900">{titulo}</h2>
@@ -67,7 +67,7 @@ export function Campo({
     <label className="mb-4 flex flex-col gap-1.5">
       <span className="text-sm font-semibold text-piedra-800">
         {etiqueta}
-        {ayuda && <span className="ml-1 font-normal text-piedra-400">{ayuda}</span>}
+        {ayuda && <span className="ml-1 font-normal text-piedra-500">{ayuda}</span>}
       </span>
       {children}
       {error && <span className="text-sm text-cancelado">{error}</span>}

@@ -161,7 +161,7 @@ export default function Clientes() {
                 <p className="cifras font-semibold text-piedra-900">
                   {dinero(c.total_spent, moneda)}
                 </p>
-                <p className="cifras text-xs text-piedra-400">
+                <p className="cifras text-xs text-piedra-500">
                   {c.total_orders} pedido{c.total_orders === 1 ? '' : 's'}
                 </p>
               </div>
@@ -184,7 +184,7 @@ export default function Clientes() {
                     if (confirm(texto)) borrar.mutate({ id: c.id, forzar: conPedidos })
                   }}
                   aria-label={`Eliminar a ${c.name || 'cliente'}`}
-                  className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
+                  className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-500
                              hover:bg-cancelado-suave hover:text-cancelado"
                 >
                   Eliminar
@@ -280,7 +280,7 @@ function FormCliente({
 
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-piedra-700">
-            Notas <span className="font-normal text-piedra-400">(opcional)</span>
+            Notas <span className="font-normal text-piedra-500">(opcional)</span>
           </span>
           <textarea
             value={notas}

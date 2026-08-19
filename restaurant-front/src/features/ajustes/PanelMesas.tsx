@@ -109,7 +109,7 @@ export default function PanelMesas() {
                     }}
                     aria-label={`Eliminar mesa ${mesa.number}`}
                     className="flex h-11 w-11 items-center justify-center rounded-lg
-                               text-piedra-400 hover:bg-cancelado-suave hover:text-cancelado"
+                               text-piedra-500 hover:bg-cancelado-suave hover:text-cancelado"
                   >
                     ✕
                   </button>
@@ -173,7 +173,7 @@ export default function PanelMesas() {
                     }}
                     aria-label={`Eliminar zona ${zona.name}`}
                     className="flex h-11 w-11 items-center justify-center rounded-lg
-                               text-piedra-400 hover:bg-cancelado-suave hover:text-cancelado"
+                               text-piedra-500 hover:bg-cancelado-suave hover:text-cancelado"
                   >
                     ✕
                   </button>

@@ -160,7 +160,7 @@ export default function PanelLocal() {
         <code className="block rounded-lg bg-piedra-100 px-3 py-2 text-sm break-all text-piedra-700">
           /menu/{data?.restaurant.slug}
         </code>
-        <p className="mt-2 text-xs text-piedra-400">
+        <p className="mt-2 text-xs text-piedra-500">
           No se puede cambiar: los QR ya impresos dejarían de funcionar.
         </p>
       </section>
@@ -202,7 +202,7 @@ function Interruptor({
     >
       <span>
         <span className="text-sm font-medium text-piedra-700">{etiqueta}</span>
-        {ayuda && <span className="block text-xs text-piedra-400">{ayuda}</span>}
+        {ayuda && <span className="block text-xs text-piedra-500">{ayuda}</span>}
       </span>
 
       <span

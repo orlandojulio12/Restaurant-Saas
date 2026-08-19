@@ -127,7 +127,7 @@ export default function PanelUsuarios() {
                           if (confirm(`¿Eliminar a ${u.name}?`)) borrar.mutate(u.id)
                         }}
                         aria-label={`Eliminar a ${u.name}`}
-                        className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-400
+                        className="min-h-11 rounded-lg px-3 text-sm font-medium text-piedra-500
                                    hover:bg-cancelado-suave hover:text-cancelado"
                       >
                         Eliminar
@@ -141,7 +141,7 @@ export default function PanelUsuarios() {
         </ul>
       )}
 
-      <p className="mt-3 text-xs text-piedra-400">
+      <p className="mt-3 text-xs text-piedra-500">
         Al desactivar a alguien se cierran sus sesiones abiertas al instante.
       </p>
 

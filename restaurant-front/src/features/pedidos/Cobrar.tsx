@@ -149,7 +149,7 @@ export default function Cobrar() {
         <p className="cifras mt-1 text-4xl font-bold text-piedra-900">
           {dinero(total, moneda)}
         </p>
-        <p className="cifras text-xs text-piedra-400">
+        <p className="cifras text-xs text-piedra-500">
           {pedido.items.length} línea{pedido.items.length === 1 ? '' : 's'}
         </p>
       </header>
@@ -245,7 +245,7 @@ export default function Cobrar() {
       {CON_REFERENCIA.includes(metodo) && (
         <label className="mb-4 flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-piedra-700">
-            Referencia <span className="font-normal text-piedra-400">(opcional)</span>
+            Referencia <span className="font-normal text-piedra-500">(opcional)</span>
           </span>
           <input
             value={referencia}

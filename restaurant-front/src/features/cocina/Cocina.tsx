@@ -118,7 +118,7 @@ export default function Cocina() {
                           px-1 text-xs font-bold ${
                             columnaMovil === columna.estado
                               ? 'bg-piedra-900 text-white'
-                              : 'bg-piedra-950 text-white/45'
+                              : 'bg-piedra-950 text-white/55'
                           }`}
             >
               <span className="cifras text-lg leading-none">{cuantos}</span>
@@ -129,7 +129,7 @@ export default function Cocina() {
       </div>
 
       {isLoading ? (
-        <p className="p-8 text-white/40">Cargando pedidos…</p>
+        <p className="p-8 text-white/55">Cargando pedidos…</p>
       ) : (
         <div className="flex min-h-0 flex-1 gap-px bg-white/10">
           {COLUMNAS.map((columna) => {
@@ -168,7 +168,7 @@ export default function Cocina() {
                 </ul>
 
                 {suyos.length === 0 && (
-                  <p className="mt-6 text-center text-sm text-white/25">Nada por aquí.</p>
+                  <p className="mt-6 text-center text-sm text-white/50">Nada por aquí.</p>
                 )}
               </section>
             )

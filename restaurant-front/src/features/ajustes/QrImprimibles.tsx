@@ -213,7 +213,7 @@ export default function QrImprimibles() {
               <p className="text-sm font-semibold text-piedra-800">
                 Escanea y pide desde tu celular
               </p>
-              <p className="text-xs text-piedra-400">
+              <p className="text-xs text-piedra-500">
                 Apunta la cámara al código
               </p>
             </article>

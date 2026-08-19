@@ -107,7 +107,7 @@ export default function Reportes() {
                 <ul className="flex flex-col gap-2">
                   {(productos.data?.data ?? []).map((p, i) => (
                     <li key={p.product_id ?? p.product_name} className="flex items-center gap-3">
-                      <span className="cifras w-5 text-sm font-bold text-piedra-400">{i + 1}</span>
+                      <span className="cifras w-5 text-sm font-bold text-piedra-500">{i + 1}</span>
                       <span className="min-w-0 flex-1 truncate text-piedra-800">{p.product_name}</span>
                       <span className="cifras text-sm text-piedra-500">{p.quantity} und.</span>
                       <span className="cifras w-24 text-right font-semibold text-piedra-900">
@@ -194,7 +194,7 @@ function Barras({ dias, moneda }: { dias: DiaVentas[]; moneda: string }) {
         })}
       </div>
 
-      <div className="mt-2 flex justify-between text-xs text-piedra-400">
+      <div className="mt-2 flex justify-between text-xs text-piedra-500">
         <span className="cifras">{dias[0]?.date.slice(5)}</span>
         <span className="cifras">{dias[dias.length - 1]?.date.slice(5)}</span>
       </div>
@@ -227,7 +227,7 @@ function FilaProporcion({
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-piedra-100">
           <div className="h-full rounded-full bg-marca-500" style={{ width: `${porcentaje}%` }} />
         </div>
-        <span className="cifras w-16 text-right text-xs text-piedra-400">{detalle}</span>
+        <span className="cifras w-16 text-right text-xs text-piedra-500">{detalle}</span>
       </div>
     </li>
   )
