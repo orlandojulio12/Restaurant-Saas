@@ -38,7 +38,7 @@
   /* Oscurecido de #8b8274. El texto secundario se lee tanto sobre blanco como
      sobre el fondo de pagina, que es algo mas oscuro: con el original daba 3.79
      y no llegaba al 4.5 de WCAG AA en ninguno de los dos. */
-  --color-piedra-500: #7a7265;
+  --color-piedra-500: #797164;
   --color-piedra-600: #6f675b;
   --color-piedra-700: #575047;
   --color-piedra-800: #3b352f;
@@ -68,7 +68,7 @@
   --color-urgente: #dc2626;
   /* Igual que el gris: el naranja original daba 3.56 sobre blanco y se usa
      para el aviso de "esto lleva esperando", que hay que poder leer. */
-  --color-atencion: #cc4d0a;
+  --color-atencion: #c54a0a;
 
   /* ── Tipografía ───────────────────────────────────────────────────────────
      Dos familias con papeles distintos.
@@ -222,4 +222,61 @@ h3 {
 
 .late-urgente {
   animation: latido 1.6s ease-in-out infinite;
+}
+
+/* ── La comanda ────────────────────────────────────────────────────────────
+   El objeto que este producto digitaliza: el papel que el mesero escribe y la
+   cocina clava en el riel. Se dibuja como tal —papel claro, borde troquelado,
+   cabecera monoespaciada como la de una impresora térmica— por dos razones que
+   no son decorativas: sobre el fondo oscuro del tablero el papel se lee mejor a
+   dos metros que una tarjeta translúcida, y el troquel da un ritmo que permite
+   contar comandas sin leerlas.
+
+   Nada de texturas ni esquinas dobladas: eso envejece mal y aquí el papel es
+   una referencia, no una imitación. */
+
+.comanda {
+  --papel: #fbf8f2;
+  background: var(--papel);
+  color: var(--color-piedra-900);
+  border-radius: 2px 2px 10px 10px;
+  position: relative;
+}
+
+/* El troquel: muescas del color del tablero mordiendo el borde superior. */
+.comanda::before {
+  content: '';
+  position: absolute;
+  inset: -1px 0 auto 0;
+  height: 7px;
+  background:
+    radial-gradient(circle at 5px 0, var(--color-piedra-950) 3.5px, transparent 3.6px)
+      repeat-x 0 0 / 10px 7px;
+}
+
+/* Lomo de color a la izquierda: la espera se lee por el canto, sin teñir el
+   papel ni pelear con el texto. */
+.comanda::after {
+  content: '';
+  position: absolute;
+  inset: 7px auto 0 0;
+  width: 5px;
+  background: var(--lomo, var(--color-piedra-300));
+  border-bottom-left-radius: 10px;
+}
+
+/* Entra deslizándose desde arriba, como si la colgaran en el riel. */
+@keyframes colgar {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.comanda {
+  animation: colgar 220ms ease-out;
 }

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { pedidosApi } from '../../api/pedidos'
 import type { EstadoPedido, Pedido } from '../../api/tipos'
-import { minutosDesde, TIPOS, transcurrido } from '../../lib/formato'
+import { hora, minutosDesde, TIPOS, transcurrido } from '../../lib/formato'
 import { useSesion } from '../auth/SesionContext'
 import { useAvisoSonoro, useCanalCocina } from './useCanalCocina'
 
@@ -24,10 +24,13 @@ const COLUMNAS: {
   corto: string
   siguiente: EstadoPedido
   accion: string
+  /* Una columna vacía en cocina no es una pantalla que haya que rellenar: es
+     una buena noticia, y el texto lo dice en vez de disculparse. */
+  vacio: string
 }[] = [
-  { estado: 'pending', titulo: 'Por preparar', corto: 'Por preparar', siguiente: 'preparing', accion: 'Empezar' },
-  { estado: 'preparing', titulo: 'En preparación', corto: 'Preparando', siguiente: 'ready', accion: 'Listo' },
-  { estado: 'ready', titulo: 'Listos para servir', corto: 'Listos', siguiente: 'delivered', accion: 'Entregado' },
+  { estado: 'pending', titulo: 'Por preparar', corto: 'Por preparar', siguiente: 'preparing', accion: 'Empezar', vacio: 'Sin comandas nuevas' },
+  { estado: 'preparing', titulo: 'En preparación', corto: 'Preparando', siguiente: 'ready', accion: 'Listo', vacio: 'Nada en el fuego' },
+  { estado: 'ready', titulo: 'Listos para servir', corto: 'Listos', siguiente: 'delivered', accion: 'Entregado', vacio: 'Todo servido' },
 ]
 
 export default function Cocina() {
@@ -168,7 +171,9 @@ export default function Cocina() {
                 </ul>
 
                 {suyos.length === 0 && (
-                  <p className="mt-6 text-center text-sm text-white/50">Nada por aquí.</p>
+                  <p className="mt-8 text-center font-mono text-sm text-white/50">
+                    {columna.vacio}
+                  </p>
                 )}
               </section>
             )
@@ -196,43 +201,56 @@ function Comanda({
   const urgente = espera >= 35
   const lenta = espera >= 20 && !urgente
 
-  const marco = urgente
-    ? 'border-urgente bg-urgente/12'
+  // La espera vive en el lomo del papel, no en el fondo: teñir la comanda
+  // entera peleaba con el texto justo cuando más urgente era leerlo.
+  const lomo = urgente
+    ? 'var(--color-urgente)'
     : lenta
-      ? 'border-atencion bg-atencion/10'
-      : 'border-white/15 bg-white/[0.06]'
+      ? 'var(--color-atencion)'
+      : 'var(--color-marca-400)'
 
   return (
-    <article className={`rounded-2xl border-2 p-4 ${marco}`}>
-      <div className="mb-3 flex items-baseline justify-between gap-2">
-        <span className="text-2xl font-bold">
-          {pedido.table ? `Mesa ${pedido.table.number}` : TIPOS[pedido.type]}
-        </span>
-        <span
-          className={`cifras text-lg font-bold ${
-            urgente
-              ? 'late-urgente text-urgente'
-              : lenta
-                ? 'text-atencion'
-                : 'text-white/50'
-          }`}
-        >
-          {transcurrido(espera)}
-        </span>
+    <article className="comanda pt-3.5" style={{ '--lomo': lomo } as React.CSSProperties}>
+      {/* Cabecera como la de un ticket impreso: mesa, hora y número, en
+          monoespaciada y separada por un punteado. */}
+      <div className="px-4 pb-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-2xl leading-none font-bold text-piedra-900">
+            {pedido.table ? `Mesa ${pedido.table.number}` : TIPOS[pedido.type]}
+          </span>
+          <span
+            className={`font-mono text-lg font-bold tabular-nums ${
+              urgente
+                ? 'late-urgente text-urgente'
+                : lenta
+                  ? 'text-atencion'
+                  : 'text-piedra-600'
+            }`}
+          >
+            {transcurrido(espera)}
+          </span>
+        </div>
+
+        <p className="mt-0.5 font-mono text-xs tracking-tight text-piedra-600">
+          #{pedido.id} · {hora(pedido.created_at)}
+        </p>
       </div>
 
-      <ul className="mb-4 flex flex-col gap-2">
+      <div className="mx-4 border-t border-dashed border-piedra-300" />
+
+      <ul className="flex flex-col gap-2.5 px-4 py-3">
         {pedido.items.map((linea) => (
           <li key={linea.id}>
-            <p className="text-lg leading-snug font-semibold">
-              <span className="cifras mr-2 rounded-md bg-white/15 px-1.5 py-0.5 text-base">
+            <p className="flex gap-2.5 text-lg leading-snug font-semibold text-piedra-900">
+              {/* La cantidad manda: es lo que se cuenta al emplatar. */}
+              <span className="font-mono text-xl font-bold text-marca-700 tabular-nums">
                 {linea.quantity}
               </span>
-              {linea.product_name}
+              <span className="min-w-0 flex-1">{linea.product_name}</span>
             </p>
 
             {(linea.additionals ?? []).length > 0 && (
-              <p className="ml-1 text-sm text-white/60">
+              <p className="ml-8 text-sm text-piedra-600">
                 {linea.additionals!.map((a) => a.additional_name).join(' · ')}
               </p>
             )}
@@ -240,9 +258,9 @@ function Comanda({
             {/* La nota es lo que más se pasa por alto y lo que más devoluciones
                 causa, así que va resaltada y no como texto secundario. */}
             {linea.notes && (
-              <p className="mt-1 ml-1 rounded-md bg-pendiente/25 px-2 py-1
-                            text-sm font-semibold text-pendiente-suave">
-                ⚠ {linea.notes}
+              <p className="mt-1 ml-8 rounded-md bg-pendiente-suave px-2 py-1
+                            text-sm font-semibold text-pendiente">
+                {linea.notes}
               </p>
             )}
           </li>
@@ -250,16 +268,18 @@ function Comanda({
       </ul>
 
       {pedido.notes && (
-        <p className="mb-3 rounded-md bg-white/10 px-2 py-1.5 text-sm text-white/80">
+        <p className="mx-4 mb-3 rounded-md bg-piedra-100 px-2.5 py-1.5 text-sm text-piedra-700">
           {pedido.notes}
         </p>
       )}
 
+      {/* Se arranca por abajo, como el talón de un ticket. */}
       <button
         onClick={onAvanzar}
         disabled={ocupado}
-        className="min-h-14 w-full rounded-xl bg-white text-lg font-bold text-piedra-950
-                   transition hover:bg-white/90 active:scale-[0.98] disabled:opacity-50"
+        className="min-h-14 w-full rounded-b-[9px] border-t border-dashed border-piedra-300
+                   bg-piedra-900 text-lg font-bold text-white transition
+                   hover:bg-piedra-800 active:bg-piedra-950 disabled:opacity-50"
       >
         {accion}
       </button>
