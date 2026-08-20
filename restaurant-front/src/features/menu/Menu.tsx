@@ -9,6 +9,7 @@ import {
   Pestanas,
   Vacio,
 } from '../../components/ui'
+import FotoProducto from '../../components/FotoProducto'
 import { dinero } from '../../lib/formato'
 import { useSesion } from '../auth/SesionContext'
 import FormCategoria from './FormCategoria'
@@ -240,18 +241,11 @@ function ListaProductos({
             p.is_available ? 'border-piedra-200' : 'border-piedra-200 opacity-60'
           }`}
         >
-          {p.image_url ? (
-            <img
-              src={p.image_url}
-              alt=""
-              className="h-16 w-16 shrink-0 rounded-xl object-cover"
-            />
-          ) : (
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl
-                            bg-piedra-100 text-2xl">
-              🍽️
-            </div>
-          )}
+          <FotoProducto
+            nombre={p.name}
+            url={p.image_url}
+            className="h-16 w-16 shrink-0 text-2xl"
+          />
 
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-piedra-900">{p.name}</p>

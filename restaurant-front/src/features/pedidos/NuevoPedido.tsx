@@ -13,6 +13,7 @@ import {
 import type { Adicional, Producto, TipoPedido } from '../../api/tipos'
 import { dinero, TIPOS } from '../../lib/formato'
 import { useSesion } from '../auth/SesionContext'
+import FotoProducto from '../../components/FotoProducto'
 import HojaAdicionales, { Contador } from './HojaAdicionales'
 
 /**
@@ -437,25 +438,44 @@ function BotonProducto({
     <button
       onClick={onClick}
       disabled={agotado}
-      className={`flex min-h-24 w-full flex-col justify-between rounded-2xl border-2 bg-white
-                  p-3 text-left transition ${
+      className={`alzado flex w-full flex-col overflow-hidden rounded-2xl border bg-white
+                  text-left ${
                     agotado
                       ? 'cursor-not-allowed border-piedra-200 opacity-50'
-                      : 'border-piedra-200 hover:border-marca-400 hover:shadow-sm active:scale-[0.98]'
+                      : 'border-piedra-200 hover:border-marca-400'
                   }`}
     >
-      <span className="font-semibold leading-snug text-piedra-900">{producto.name}</span>
-      <span className="mt-2 flex items-center justify-between">
-        <span className="cifras font-semibold text-piedra-700">
-          {dinero(producto.price, moneda)}
-        </span>
-        {agotado ? (
-          <span className="text-xs font-semibold text-piedra-500">Agotado</span>
-        ) : (
-          (producto.additional_groups ?? []).length > 0 && (
-            <span className="text-xs text-piedra-500">opciones</span>
-          )
+      {/* La foto ocupa la mitad de la tarjeta: en plena sala se reconoce el
+          plato por la imagen mucho antes que por el nombre. */}
+      <span className="relative block">
+        <FotoProducto
+          nombre={producto.name}
+          url={producto.image_url}
+          redondeo="rounded-none"
+          className="h-24 w-full text-3xl sm:h-28"
+        />
+
+        {agotado && (
+          <span
+            className="absolute inset-x-0 bottom-0 bg-piedra-900/80 py-1 text-center text-xs
+                       font-bold text-white"
+          >
+            Agotado
+          </span>
         )}
+      </span>
+
+      <span className="flex flex-1 flex-col justify-between gap-1 p-2.5">
+        <span className="leading-snug font-semibold text-piedra-900">{producto.name}</span>
+
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="cifras font-semibold text-piedra-700">
+            {dinero(producto.price, moneda)}
+          </span>
+          {!agotado && (producto.additional_groups ?? []).length > 0 && (
+            <span className="text-xs text-piedra-500">opciones</span>
+          )}
+        </span>
       </span>
     </button>
   )

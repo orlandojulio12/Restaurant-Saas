@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useParams, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
+import FotoProducto from '../../components/FotoProducto'
 import { dinero } from '../../lib/formato'
 
 /**
@@ -227,13 +228,11 @@ export default function MenuPublico() {
                                  bg-white p-3 text-left hover:border-marca-300
                                  disabled:opacity-60"
                     >
-                      {producto.image_url && (
-                        <img
-                          src={producto.image_url}
-                          alt=""
-                          className="h-20 w-20 shrink-0 rounded-xl object-cover"
-                        />
-                      )}
+                      <FotoProducto
+                        nombre={producto.name}
+                        url={producto.image_url}
+                        className="h-20 w-20 shrink-0 text-2xl"
+                      />
 
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-piedra-900">{producto.name}</p>
