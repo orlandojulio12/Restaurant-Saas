@@ -8,6 +8,7 @@ import Inventario from './features/inventario/Inventario'
 import Menu from './features/menu/Menu'
 import Mesas from './features/mesas/Mesas'
 import Finanzas from './features/finanzas/Finanzas'
+import Inicio from './features/inicio/Inicio'
 import Ajustes from './features/ajustes/Ajustes'
 import QrImprimibles from './features/ajustes/QrImprimibles'
 import Clientes from './features/clientes/Clientes'
@@ -29,7 +30,8 @@ export default function App() {
         <Route path="/entrar" element={<SoloInvitados><Entrar /></SoloInvitados>} />
 
         <Route element={<Protegida><Layout /></Protegida>}>
-          <Route index element={<Inicio />} />
+          <Route index element={<Aterrizaje />} />
+          <Route path="/inicio" element={<Inicio />} />
           <Route path="/mesas" element={<Mesas />} />
           <Route path="/pedidos" element={<Pedidos />} />
           <Route path="/pedidos/nuevo" element={<NuevoPedido />} />
@@ -52,11 +54,13 @@ export default function App() {
 }
 
 /** Cada rol aterriza donde trabaja, no en un panel genérico. */
-function Inicio() {
+function Aterrizaje() {
   const { sesion } = useSesion()
 
   const destino: Record<Rol, string> = {
-    admin: '/mesas',
+    // Solo el administrador aterriza en el panel: a quien atiende mesas le
+    // sirve mas el plano que un resumen de cifras.
+    admin: '/inicio',
     waiter: '/mesas',
     cashier: '/mesas',
     kitchen: '/cocina',

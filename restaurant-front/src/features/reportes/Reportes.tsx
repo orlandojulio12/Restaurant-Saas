@@ -164,7 +164,7 @@ export default function Reportes() {
  * Barras en CSS puro: para "¿qué día vendí más?" basta con comparar alturas,
  * y así no se arrastra una librería de gráficos entera.
  */
-function Barras({ dias, moneda }: { dias: DiaVentas[]; moneda: string }) {
+export function Barras({ dias, moneda }: { dias: DiaVentas[]; moneda: string }) {
   const maximo = Math.max(...dias.map((d) => d.sales), 1)
   const mejor = dias.reduce((a, b) => (b.sales > a.sales ? b : a), dias[0])
 

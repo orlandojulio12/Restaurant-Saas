@@ -21,6 +21,7 @@ type Entrada = {
   o en sala eso se paga en segundos por pedido.
 */
 const MENU: Entrada[] = [
+  { a: '/inicio', texto: 'Inicio', icono: '📈', roles: ['admin'], principal: true },
   { a: '/mesas', texto: 'Mesas', icono: '🪑', roles: ['admin', 'waiter', 'cashier'], principal: true },
   { a: '/pedidos', texto: 'Pedidos', icono: '🧾', roles: ['admin', 'waiter', 'cashier'], principal: true },
   { a: '/cocina', texto: 'Cocina', icono: '👨‍🍳', roles: ['admin', 'kitchen'], principal: true },
