@@ -8,9 +8,29 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Restaurant;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Storage;
 
 class MenuSeeder extends Seeder
 {
+    /**
+     * Fotos de demostración, en `database/seeders/fotos/`.
+     *
+     * Solo llevan licencias sin obligación de compartir igual —dominio público,
+     * CC0 y CC BY—; la autoría de cada una está en `fotos/creditos.json`. Dos
+     * platos se quedan sin foto a propósito: así el panel enseña también cómo
+     * se ve un producto sin imagen, que es como empieza cualquier restaurante.
+     */
+    private const FOTOS = [
+        'Empanadas x3'          => 'empanadas.jpg',
+        'Bandeja Paisa'         => 'bandeja-paisa.jpg',
+        'Arroz con Pollo'       => 'arroz-con-pollo.jpg',
+        'Sobrebarriga al horno' => 'sobrebarriga.jpg',
+        'Jugo Natural'          => 'jugo-natural.jpg',
+        'Gaseosa'               => 'gaseosa.jpg',
+        'Agua'                  => 'agua.jpg',
+        'Tres Leches'           => 'tres-leches.jpg',
+    ];
+
     public function run(): void
     {
         $restaurant = Restaurant::where('slug', 'el-rincon-de-prueba')->firstOrFail();
@@ -71,6 +91,8 @@ class MenuSeeder extends Seeder
                     ]
                 );
 
+                $this->ponerFoto($product, $restaurant->id);
+
                 if ($categoryName === 'Bebidas') {
                     $bebidasProducts[] = $product;
                 }
@@ -103,5 +125,33 @@ class MenuSeeder extends Seeder
         foreach ($bebidasProducts as $product) {
             $product->additionalGroups()->syncWithoutDetaching([$group->id]);
         }
+    }
+
+    /**
+     * Copia la foto al disco público y deja la URL en el producto.
+     *
+     * Se hace aquí y no en el propio seeder de datos porque `storage/` está
+     * fuera del repositorio: las imágenes viajan en `database/seeders/fotos/` y
+     * se publican en cada `migrate:fresh --seed`.
+     */
+    private function ponerFoto(Product $product, int $restaurantId): void
+    {
+        $archivo = self::FOTOS[$product->name] ?? null;
+
+        if (!$archivo) {
+            return;
+        }
+
+        $origen = database_path("seeders/fotos/{$archivo}");
+
+        if (!is_file($origen)) {
+            return;
+        }
+
+        $ruta = "products/{$restaurantId}/{$archivo}";
+
+        Storage::disk('public')->put($ruta, file_get_contents($origen));
+
+        $product->update(['image_url' => Storage::disk('public')->url($ruta)]);
     }
 }
