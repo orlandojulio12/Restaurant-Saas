@@ -62,5 +62,14 @@
         "autor": "@joefoodie",
         "origen": "File:Pastel de Tres Leches.jpg",
         "pagina": "https://commons.wikimedia.org/wiki/File:Pastel_de_Tres_Leches.jpg"
+    },
+    {
+        "archivo": "portada.jpg",
+        "nota": "Recorte 10:3 de bandeja-paisa.jpg para la banda de portada de la carta. Misma licencia y autoría que el original.",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Bandeja_Paisa_%28Bogot%C3%A1%29.jpg/960px-Bandeja_Paisa_%28Bogot%C3%A1%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "licencia": "CC BY 2.0",
+        "autor": "Edgar Zuniga Jr.",
+        "origen": "File:Bandeja Paisa (Bogotá).jpg",
+        "pagina": "https://commons.wikimedia.org/wiki/File:Bandeja_Paisa_(Bogot%C3%A1).jpg"
     }
 ]
