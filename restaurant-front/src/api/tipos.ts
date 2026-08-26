@@ -13,7 +13,18 @@ export type EstadoPedido =
   | 'closed'
   | 'cancelled'
 
-export type TipoPedido = 'dine_in' | 'delivery' | 'counter'
+export type TipoPedido =
+  | 'dine_in'
+  | 'delivery'
+  | 'counter'
+  /**
+   * Lo que la mesa se lleva. Conserva su `table_id` y entra en la misma cuenta
+   * que el resto: no es una venta de mostrador, solo cambia cómo se empaca.
+   */
+  | 'takeaway'
+
+/** Lo único que un comensal puede elegir desde el QR de su mesa. */
+export type TipoPedidoQr = Extract<TipoPedido, 'dine_in' | 'takeaway'>
 
 export type EstadoMesa = 'available' | 'occupied' | 'reserved' | 'disabled'
 
@@ -51,6 +62,9 @@ export type Restaurante = {
   currency: string
   timezone: string
   logo_url: string | null
+  /** Hex del que la carta pública deriva su paleta. Null = paleta por defecto. */
+  brand_color: string | null
+  cover_url: string | null
   plan: Plan
 }
 
@@ -114,7 +128,11 @@ export type Mesa = {
   status: EstadoMesa
   /** Solo viene si el backend cargó la relación. */
   zone?: { id: number; name: string } | null
-  /** El pedido abierto de la mesa, si lo hay. */
+  /**
+   * El pedido de la mesa que reclama atención: una propuesta sin confirmar si
+   * la hay, y si no el más viejo. No es "el" pedido de la mesa — con el QR
+   * cada comensal abre el suyo, así que para el dinero está `active_total`.
+   */
   active_order?: {
     id: number
     status: EstadoPedido
@@ -122,6 +140,10 @@ export type Mesa = {
     items_count: number
     elapsed_min: number | null
   } | null
+  /** Cuántos pedidos abiertos tiene la mesa en total. */
+  active_orders_count?: number
+  /** Lo que debe la mesa entera, sumando todos sus pedidos abiertos. */
+  active_total?: string
 }
 
 export type AdicionalDeLinea = {
@@ -151,6 +173,8 @@ export type Pedido = {
   delivery_address: string | null
   delivery_notes: string | null
   notes: string | null
+  /** Quién pidió. Solo lo traen los pedidos que entran por el QR. */
+  diner_name: string | null
   subtotal: string
   tax_amount: string
   discount_amount: string

@@ -70,6 +70,11 @@ class SettingsController extends Controller
             'timezone'        => ['nullable', 'string', 'max:50', 'timezone'],
             'logo_url'        => ['nullable', 'string', 'max:500'],
             'logo'            => ['nullable', 'image', 'max:5120'],
+            // Marca de la carta pública. El hex se valida entero: de él se
+            // deriva la paleta del menú, y un valor raro rompería el render.
+            'brand_color'     => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'cover_url'       => ['nullable', 'string', 'max:500'],
+            'cover'           => ['nullable', 'image', 'max:5120'],
 
             'settings'                 => ['sometimes', 'array'],
             'settings.mode'            => ['nullable', 'in:tables,counter,delivery'],
@@ -81,16 +86,33 @@ class SettingsController extends Controller
 
         DB::transaction(function () use ($data, $request, $restaurant) {
             $campos = collect($data)
-                ->only(['name', 'phone', 'whatsapp_number', 'address', 'city', 'country', 'currency', 'timezone', 'logo_url'])
+                ->only([
+                    'name', 'phone', 'whatsapp_number', 'address', 'city', 'country',
+                    'currency', 'timezone', 'logo_url', 'brand_color', 'cover_url',
+                ])
                 ->all();
 
-            if ($request->hasFile('logo')) {
-                $anterior            = $restaurant->logo_url;
-                $campos['logo_url']  = $this->images->store($request->file('logo'), "logos/{$restaurant->id}");
+            // Las dos imágenes siguen el mismo camino: se sube la nueva, se
+            // guarda, y solo entonces se borra la anterior. Al revés, un fallo
+            // al subir dejaría al restaurante sin la que ya tenía.
+            $reemplazadas = [];
+
+            foreach (['logo' => 'logo_url', 'cover' => 'cover_url'] as $archivo => $columna) {
+                if ($request->hasFile($archivo)) {
+                    $reemplazadas[]   = $restaurant->{$columna};
+                    $campos[$columna] = $this->images->store(
+                        $request->file($archivo),
+                        "{$archivo}s/{$restaurant->id}",
+                    );
+                }
+            }
+
+            if ($campos) {
                 $restaurant->update($campos);
-                $this->images->delete($anterior);
-            } elseif ($campos) {
-                $restaurant->update($campos);
+
+                foreach ($reemplazadas as $anterior) {
+                    $this->images->delete($anterior);
+                }
             }
 
             foreach ($data['settings'] ?? [] as $key => $value) {
@@ -117,6 +139,8 @@ class SettingsController extends Controller
                 'city'            => $restaurant->city,
                 'country'         => $restaurant->country,
                 'logo_url'        => $restaurant->logo_url,
+                'brand_color'     => $restaurant->brand_color,
+                'cover_url'       => $restaurant->cover_url,
                 'currency'        => $restaurant->currency,
                 'timezone'        => $restaurant->timezone,
             ],

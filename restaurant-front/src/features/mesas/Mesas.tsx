@@ -83,6 +83,12 @@ function TarjetaMesa({ mesa, moneda }: { mesa: Mesa; moneda: string }) {
   const pedido = mesa.active_order
   const espera = pedido?.elapsed_min ?? null
 
+  // Con el QR cada comensal abre su propio pedido, así que una mesa puede
+  // tener varios. El dinero que se muestra es el de la mesa entera: enseñar el
+  // de uno solo hacía que el mesero fuera a cobrar la tercera parte.
+  const cuantos = mesa.active_orders_count ?? (pedido ? 1 : 0)
+  const totalMesa = mesa.active_total ?? pedido?.total ?? '0'
+
   // Umbrales de atención: a los 20 minutos algo va lento, a los 35 hay que ir.
   const urgente = espera !== null && espera >= 35
   const lenta = espera !== null && espera >= 20 && !urgente
@@ -115,7 +121,7 @@ function TarjetaMesa({ mesa, moneda }: { mesa: Mesa; moneda: string }) {
       {pedido ? (
         <div className="mt-2">
           <p className="cifras text-sm font-semibold text-piedra-800">
-            {dinero(pedido.total, moneda)}
+            {dinero(totalMesa, moneda)}
           </p>
           {porConfirmar && (
             <p className="mt-0.5 text-xs font-semibold text-camino">
@@ -123,7 +129,11 @@ function TarjetaMesa({ mesa, moneda }: { mesa: Mesa; moneda: string }) {
             </p>
           )}
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-piedra-500">
-            <span className="cifras">{pedido.items_count} art.</span>
+            {cuantos > 1 ? (
+              <span className="cifras font-semibold text-piedra-700">{cuantos} pedidos</span>
+            ) : (
+              <span className="cifras">{pedido.items_count} art.</span>
+            )}
             <span aria-hidden>·</span>
             <span
               className={`cifras font-semibold ${

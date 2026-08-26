@@ -79,7 +79,10 @@ export const ESTADOS: Record<EstadoPedido, { etiqueta: string; clase: string; pu
 export const TIPOS: Record<TipoPedido, string> = {
   dine_in: 'En mesa',
   delivery: 'Domicilio',
-  counter: 'Para llevar',
+  // 'counter' es la venta de barra: nadie ocupa una mesa. 'takeaway' es la
+  // mesa que se lleva parte de lo que pidió, y sigue contando como salón.
+  counter: 'Mostrador',
+  takeaway: 'Para llevar',
 }
 
 export const METODOS_PAGO: Record<MetodoPago, string> = {

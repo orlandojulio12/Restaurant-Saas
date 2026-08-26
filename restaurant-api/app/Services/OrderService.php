@@ -48,6 +48,9 @@ class OrderService
                 'delivery_address' => $data['delivery_address'] ?? null,
                 'delivery_notes'   => $data['delivery_notes'] ?? null,
                 'notes'            => $data['notes'] ?? null,
+                // Quién pidió. Solo lo trae el QR: en el panel el responsable
+                // del pedido es el usuario autenticado.
+                'diner_name'       => $data['diner_name'] ?? null,
                 'subtotal'         => 0,
                 'tax_amount'       => 0,
                 'discount_amount'  => 0,
@@ -94,7 +97,10 @@ class OrderService
 
             $order->update(['subtotal' => $subtotal, 'total' => $subtotal]);
 
-            if ($data['type'] === 'dine_in' && !empty($data['table_id'])) {
+            // Basta con que el pedido tenga mesa. Lo que la mesa 5 se lleva
+            // sigue siendo la mesa 5 ocupada, y comprobar el tipo dejaba un
+            // `takeaway` pedido desde el salón sin marcarla.
+            if (!empty($data['table_id'])) {
                 RestaurantTable::where('id', $data['table_id'])
                     ->where('restaurant_id', $restaurantId)
                     ->update(['status' => 'occupied']);

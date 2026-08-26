@@ -1,23 +1,42 @@
-import { useMemo, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import FotoProducto from '../../components/FotoProducto'
 import { dinero } from '../../lib/formato'
+import { variablesDeMarca } from '../../lib/paleta'
+import type { EstadoPedido, TipoPedidoQr } from '../../api/tipos'
 
 /**
- * Menú público del QR.
+ * La carta del QR.
  *
- * Es lo único que ve el cliente final, y no se parece al panel: quien lo abre
- * no ha iniciado sesión, no ha instalado nada, está sentado en una mesa con su
- * propio móvil y probablemente con mala señal. Así que aquí no hay barra de
- * navegación, ni roles, ni nada que aprender — solo la carta, un carrito y un
- * botón. La mesa la trae el QR; el cliente no la elige ni la escribe.
+ * Es lo único que ve el cliente final y no se parece al panel: quien la abre no
+ * ha iniciado sesión, no ha instalado nada, está sentado a una mesa con su
+ * propio móvil y probablemente con mala señal. Ni barra de navegación, ni
+ * roles, ni nada que aprender.
+ *
+ * Dos cosas la separan de una carta digital cualquiera.
+ *
+ * La primera es que la mesa es compartida. Cuatro personas escanean el mismo
+ * adhesivo y cada una manda su pedido; sin ver lo que ya pidieron los demás,
+ * piden dos veces la misma limonada y le preguntan al mesero si su plato entró.
+ * Por eso la cuenta de la mesa está siempre presente abajo, se actualiza sola y
+ * es el mismo sitio donde vive el carrito: dos barras compitiendo en un móvil
+ * es una barra de más.
+ *
+ * La segunda es que esto es un SaaS: la carta tiene que ser del restaurante, no
+ * del producto. El color que eligió el administrador manda sobre la paleta
+ * entera (ver `lib/paleta.ts`) y su logo y su fachada encabezan la página. Sin
+ * marca configurada cae en la paleta por defecto, que es lo correcto mientras
+ * no hayan subido nada.
  */
 
 // Cliente propio, sin el interceptor que redirige al login: aquí no hay sesión
 // que expirar y un 401 no debe sacar a nadie a ninguna parte.
 const publico = axios.create({ baseURL: '/api', headers: { Accept: 'application/json' } })
+
+/** Cada cuánto se vuelve a mirar lo que lleva pedido la mesa. */
+const REFRESCO_MESA = 15_000
 
 type AdicionalPub = { id: number; name: string; extra_price: string }
 type GrupoPub = {
@@ -37,9 +56,33 @@ type ProductoPub = {
   additional_groups: GrupoPub[]
 }
 type MenuPub = {
-  restaurant: { id: number; name: string; logo_url: string | null; currency: string }
+  restaurant: {
+    id: number
+    name: string
+    logo_url: string | null
+    brand_color: string | null
+    cover_url: string | null
+    address: string | null
+    currency: string
+  }
   table: { id: number; number: string } | null
   categories: { id: number; name: string; image_url: string | null; products: ProductoPub[] }[]
+}
+
+type RondaMesa = {
+  id: number
+  round: number
+  status: EstadoPedido
+  type: TipoPedidoQr
+  diner_name: string | null
+  total: string
+  created_at: string
+  items: { name: string; quantity: number; subtotal: string; additionals: string[] }[]
+}
+type EstadoMesaPub = {
+  table: { id: number; number: string }
+  orders: RondaMesa[]
+  total: number
 }
 
 type Linea = {
@@ -50,16 +93,67 @@ type Linea = {
   adicionales: AdicionalPub[]
 }
 
+/**
+ * Lo que ve el comensal de cada estado. No es el mismo vocabulario del panel:
+ * al cliente no le dice nada "pending", le dice algo "el mesero lo está
+ * confirmando". Y no aparecen los estados terminales porque un pedido cerrado
+ * ya salió de la cuenta de la mesa.
+ */
+const ESTADO_COMENSAL: Partial<Record<EstadoPedido, { texto: string; clase: string }>> = {
+  proposed: { texto: 'Esperando al mesero', clase: 'bg-pendiente-suave text-pendiente' },
+  pending: { texto: 'Confirmado', clase: 'bg-pendiente-suave text-pendiente' },
+  preparing: { texto: 'En la cocina', clase: 'bg-preparando-suave text-preparando' },
+  ready: { texto: 'Listo, ya sale', clase: 'bg-listo-suave text-listo' },
+  on_the_way: { texto: 'En camino', clase: 'bg-camino-suave text-camino' },
+  delivered: { texto: 'Servido', clase: 'bg-entregado-suave text-entregado' },
+}
+
+/**
+ * Recuerda un valor en el móvil de quien pide, sin romperse en modo privado.
+ *
+ * Devuelve el mismo par que `useState`, con actualizador funcional incluido: sin
+ * él, dos toques seguidos en la carta —que es exactamente como se añade a un
+ * carrito— leen el mismo estado viejo y el segundo plato se pierde.
+ */
+function useRecordado<T>(clave: string, inicial: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [valor, setValor] = useState<T>(() => {
+    try {
+      const guardado = localStorage.getItem(clave)
+      return guardado ? (JSON.parse(guardado) as T) : inicial
+    } catch {
+      return inicial
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(clave, JSON.stringify(valor))
+    } catch {
+      // Navegación privada o almacenamiento lleno. Se pierde el carrito al
+      // recargar, que es exactamente lo que pasaba antes de recordarlo.
+    }
+  }, [clave, valor])
+
+  return [valor, setValor]
+}
+
 export default function MenuPublico() {
   const { slug } = useParams()
   const [params] = useSearchParams()
   const codigoMesa = params.get('mesa') ?? ''
+  const cliente = useQueryClient()
 
-  const [carrito, setCarrito] = useState<Linea[]>([])
+  // El carrito sobrevive a recargar y a que se apague la pantalla, que en una
+  // mesa pasa constantemente. Va por mesa: el mismo móvil en otra mesa empieza
+  // de cero.
+  const [carrito, setCarrito] = useRecordado<Linea[]>(`carrito:${slug}:${codigoMesa}`, [])
+  const [nombre, setNombre] = useRecordado<string>(`comensal:${slug}`, '')
+
   const [configurando, setConfigurando] = useState<ProductoPub | null>(null)
-  const [carritoAbierto, setCarritoAbierto] = useState(false)
+  const [hoja, setHoja] = useState<'carrito' | 'comanda' | null>(null)
   const [notaGeneral, setNotaGeneral] = useState('')
-  const [enviado, setEnviado] = useState<{ id: number; propuesta: boolean } | null>(null)
+  const [tipo, setTipo] = useState<TipoPedidoQr>('dine_in')
+  const [reciente, setReciente] = useState<number | null>(null)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['menu-publico', slug, codigoMesa],
@@ -72,13 +166,30 @@ export default function MenuPublico() {
     retry: 1,
   })
 
+  // La cuenta de la mesa se refresca sola: mientras miras la carta, alguien
+  // sentado enfrente puede estar pidiendo.
+  const { data: mesa } = useQuery({
+    queryKey: ['estado-mesa', slug, codigoMesa],
+    queryFn: async () =>
+      (await publico.get<EstadoMesaPub>(`/menu/${slug}/mesa/${codigoMesa}`)).data,
+    enabled: Boolean(codigoMesa),
+    refetchInterval: REFRESCO_MESA,
+    // Con la pantalla apagada no hay nadie mirando, y el móvil está en una mesa
+    // sin cargador.
+    refetchIntervalInBackground: false,
+    retry: 1,
+  })
+
   const moneda = data?.restaurant.currency ?? 'COP'
+  const rondas = mesa?.orders ?? []
 
   const enviar = useMutation({
     mutationFn: async () => {
       const { data: pedido } = await publico.post('/orders/qr', {
         restaurant_slug: slug,
         qr_code: codigoMesa,
+        type: tipo,
+        diner_name: nombre.trim() || null,
         notes: notaGeneral || null,
         items: carrito.map((l) => ({
           product_id: l.producto.id,
@@ -87,12 +198,17 @@ export default function MenuPublico() {
           additionals: l.adicionales.map((a) => a.id),
         })),
       })
-      return pedido as { id: number; status: string }
+      return pedido as { id: number; status: EstadoPedido }
     },
     onSuccess: (pedido) => {
-      setEnviado({ id: pedido.id, propuesta: pedido.status === 'proposed' })
       setCarrito([])
-      setCarritoAbierto(false)
+      setNotaGeneral('')
+      setTipo('dine_in')
+      setReciente(pedido.id)
+      // A la cuenta de la mesa, no a una pantalla sin salida: ahí ve su ronda
+      // junto a las de los demás y puede seguir pidiendo.
+      setHoja('comanda')
+      cliente.invalidateQueries({ queryKey: ['estado-mesa', slug, codigoMesa] })
     },
   })
 
@@ -118,17 +234,11 @@ export default function MenuPublico() {
       notas.trim(),
     ].join('|')
 
-    setCarrito((previo) => {
-      const existente = previo.find((l) => l.clave === clave)
-
-      if (existente) {
-        return previo.map((l) =>
-          l.clave === clave ? { ...l, cantidad: l.cantidad + cantidad } : l,
-        )
-      }
-
-      return [...previo, { clave, producto, cantidad, notas, adicionales }]
-    })
+    setCarrito((previo) =>
+      previo.some((l) => l.clave === clave)
+        ? previo.map((l) => (l.clave === clave ? { ...l, cantidad: l.cantidad + cantidad } : l))
+        : [...previo, { clave, producto, cantidad, notas, adicionales }],
+    )
 
     setConfigurando(null)
   }
@@ -138,124 +248,58 @@ export default function MenuPublico() {
   if (isError || !data) {
     return (
       <Centrado
-        emoji="😕"
-        titulo="No encontramos este menú"
-        texto="Puede que el enlace esté mal o que el restaurante no esté disponible ahora mismo."
+        titulo="No encontramos esta carta"
+        texto="Puede que el enlace esté mal escrito o que el restaurante no esté abierto ahora mismo. Pídele ayuda a alguien del personal."
       />
     )
   }
 
-  if (enviado) {
-    // Lo que ve el cliente tiene que corresponder con lo que de verdad pasó: si
-    // el restaurante pide confirmación, decirle "ya está en cocina" sería
-    // mentirle y se quedaría esperando comida que nadie ha empezado.
-    return (
-      <Centrado
-        emoji={enviado.propuesta ? '🙋' : '✅'}
-        titulo={enviado.propuesta ? '¡Pedido enviado al mesero!' : '¡Pedido enviado!'}
-        texto={
-          enviado.propuesta
-            ? `Pasará por la mesa ${data.table?.number ?? ''} a confirmarlo contigo y de ahí va a cocina. Puedes seguir añadiendo cosas mientras tanto.`
-            : data.table
-              ? `Ya lo está viendo la cocina. Se lo llevamos a la mesa ${data.table.number}.`
-              : 'Ya lo está viendo la cocina.'
-        }
-      >
-        <p className="cifras mt-4 text-sm text-piedra-500">Pedido #{enviado.id}</p>
-        <button
-          onClick={() => setEnviado(null)}
-          className="mt-6 min-h-12 rounded-xl bg-marca-600 px-5 font-semibold text-white"
-        >
-          Pedir algo más
-        </button>
-      </Centrado>
-    )
-  }
-
-  // Sin mesa reconocida no se puede pedir: el pedido no sabría a dónde ir.
-  // Se deja ver la carta igualmente, que para eso también sirve.
+  const { restaurant } = data
+  // Sin mesa reconocida no se puede pedir: el pedido no sabría a dónde ir. La
+  // carta se deja ver igualmente, que para eso también sirve.
   const sinMesa = !data.table
 
   return (
-    <div className="min-h-dvh bg-piedra-50 pb-28">
-      <header className="border-b border-piedra-200 bg-white px-4 py-4">
-        <div className="mx-auto flex max-w-2xl items-center gap-3">
-          {data.restaurant.logo_url && (
-            <img src={data.restaurant.logo_url} alt="" className="h-11 w-11 rounded-xl object-cover" />
-          )}
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold text-piedra-900">{data.restaurant.name}</h1>
-            {data.table ? (
-              <p className="text-sm text-piedra-500">Mesa {data.table.number}</p>
-            ) : (
-              <p className="text-sm text-atencion">Carta — sin mesa asignada</p>
-            )}
-          </div>
-        </div>
-      </header>
+    <div
+      // Aquí es donde la carta deja de ser del producto y pasa a ser del
+      // restaurante: estas variables sustituyen la paleta para todo lo que
+      // cuelgue debajo, sin tocar una sola clase.
+      style={variablesDeMarca(restaurant.brand_color)}
+      className="min-h-dvh bg-piedra-50"
+    >
+      <Portada restaurante={restaurant} mesa={data.table} />
 
       {sinMesa && (
-        <div className="mx-auto max-w-2xl px-4 pt-4">
-          <p className="rounded-xl border border-atencion bg-white p-4 text-sm text-piedra-700">
-            Para pedir desde aquí escanea el código QR de tu mesa. Si ya lo hiciste, pide ayuda al
-            personal: puede que el código esté dañado.
+        <div className="mx-auto max-w-2xl px-5 pt-5">
+          <p className="rounded-xl border border-atencion/40 bg-white p-4 text-sm text-piedra-700">
+            <strong className="font-semibold">Estás viendo la carta, pero no puedes pedir.</strong>{' '}
+            Escanea el código de tu mesa para hacerlo. Si ya lo hiciste, avisa al personal: puede
+            que el adhesivo esté dañado.
           </p>
         </div>
       )}
 
-      <main className="mx-auto max-w-2xl px-4 py-4">
+      <main className="mx-auto max-w-2xl px-5 pb-40 pt-8">
         {data.categories.map((categoria) => {
           if (categoria.products.length === 0) return null
 
           return (
-            <section key={categoria.id} className="mb-7">
-              <h2 className="mb-3 text-lg font-bold text-piedra-900">{categoria.name}</h2>
+            <section key={categoria.id} className="mb-11">
+              <RotuloSeccion nombre={categoria.name} platos={categoria.products.length} />
 
-              <ul className="flex flex-col gap-2">
+              <ul>
                 {categoria.products.map((producto) => (
                   <li key={producto.id}>
-                    <button
-                      onClick={() => {
-                        const tieneOpciones = producto.additional_groups.some(
-                          (g) => g.additionals.length > 0,
-                        )
-                        tieneOpciones
+                    <Plato
+                      producto={producto}
+                      moneda={moneda}
+                      deshabilitado={sinMesa}
+                      onElegir={() =>
+                        producto.additional_groups.some((g) => g.additionals.length > 0)
                           ? setConfigurando(producto)
                           : agregar(producto, [], '', 1)
-                      }}
-                      disabled={sinMesa}
-                      className="alzado flex w-full items-center gap-3 rounded-2xl border border-piedra-200
-                                 bg-white p-3 text-left hover:border-marca-300
-                                 disabled:opacity-60"
-                    >
-                      <FotoProducto
-                        nombre={producto.name}
-                        url={producto.image_url}
-                        className="h-20 w-20 shrink-0 text-2xl"
-                      />
-
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-piedra-900">{producto.name}</p>
-                        {producto.description && (
-                          <p className="mt-0.5 line-clamp-2 text-sm text-piedra-500">
-                            {producto.description}
-                          </p>
-                        )}
-                        <p className="cifras mt-1 font-bold text-marca-700">
-                          {dinero(producto.price, moneda)}
-                        </p>
-                      </div>
-
-                      {!sinMesa && (
-                        <span
-                          aria-hidden
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full
-                                     bg-marca-600 text-xl font-bold text-white"
-                        >
-                          +
-                        </span>
-                      )}
-                    </button>
+                      }
+                    />
                   </li>
                 ))}
               </ul>
@@ -264,28 +308,22 @@ export default function MenuPublico() {
         })}
 
         {data.categories.every((c) => c.products.length === 0) && (
-          <p className="rounded-2xl border border-dashed border-piedra-300 p-10 text-center
-                        text-piedra-500">
-            Este menú todavía no tiene productos.
+          <p className="rounded-2xl border border-dashed border-piedra-300 p-12 text-center text-piedra-500">
+            Esta carta todavía no tiene platos.
           </p>
         )}
       </main>
 
-      {/* Barra del carrito: siempre visible en cuanto hay algo, porque en un
-          móvil el carrito arriba se olvida. */}
-      {carrito.length > 0 && !carritoAbierto && (
-        <button
-          onClick={() => setCarritoAbierto(true)}
-          className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3
-                     bg-marca-600 px-5 py-4 text-white shadow-lg"
-        >
-          <span className="cifras flex h-8 w-8 items-center justify-center rounded-full
-                           bg-white/20 font-bold">
-            {unidades}
-          </span>
-          <span className="font-semibold">Ver mi pedido</span>
-          <span className="cifras font-bold">{dinero(total, moneda)}</span>
-        </button>
+      {!hoja && (
+        <BarraMesa
+          unidades={unidades}
+          totalCarrito={total}
+          rondas={rondas.length}
+          totalMesa={mesa?.total ?? 0}
+          moneda={moneda}
+          onCarrito={() => setHoja('carrito')}
+          onComanda={() => setHoja('comanda')}
+        />
       )}
 
       {configurando && (
@@ -297,16 +335,21 @@ export default function MenuPublico() {
         />
       )}
 
-      {carritoAbierto && (
+      {hoja === 'carrito' && (
         <HojaCarrito
           carrito={carrito}
           moneda={moneda}
           total={total}
           nota={notaGeneral}
           onNota={setNotaGeneral}
+          nombre={nombre}
+          onNombre={setNombre}
+          tipo={tipo}
+          onTipo={setTipo}
+          mesa={data.table?.number ?? ''}
           enviando={enviar.isPending}
           error={enviar.isError ? 'No pudimos enviar el pedido. Inténtalo otra vez.' : null}
-          onCerrar={() => setCarritoAbierto(false)}
+          onCerrar={() => setHoja(null)}
           onCambiarCantidad={(clave, cantidad) =>
             setCarrito((previo) =>
               cantidad <= 0
@@ -317,7 +360,386 @@ export default function MenuPublico() {
           onEnviar={() => enviar.mutate()}
         />
       )}
+
+      {hoja === 'comanda' && (
+        <HojaComanda
+          rondas={rondas}
+          total={mesa?.total ?? 0}
+          moneda={moneda}
+          mesa={data.table?.number ?? ''}
+          reciente={reciente}
+          onCerrar={() => {
+            setHoja(null)
+            setReciente(null)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/**
+ * La cabecera.
+ *
+ * El color va plano y a plena saturación, y la foto de la fachada va debajo
+ * como una banda propia en vez de detrás del texto. Un degradado oscuro sobre
+ * la foto es lo que hace todo el mundo, y neutraliza justo lo que aquí importa:
+ * con él, la cabecera de todos los restaurantes acaba siendo del mismo gris.
+ */
+function Portada({
+  restaurante,
+  mesa,
+}: {
+  restaurante: MenuPub['restaurant']
+  mesa: MenuPub['table']
+}) {
+  return (
+    <header>
+      <div
+        className="px-5 pb-7 pt-9"
+        style={{
+          background: 'var(--marca-pura, var(--color-marca-700))',
+          color: 'var(--tinta-marca, #ffffff)',
+        }}
+      >
+        <div className="mx-auto flex max-w-2xl items-end gap-4">
+          {restaurante.logo_url && (
+            <img
+              src={restaurante.logo_url}
+              alt=""
+              className="h-16 w-16 shrink-0 rounded-2xl bg-white/95 object-contain p-1.5"
+            />
+          )}
+
+          <div className="min-w-0 flex-1">
+            {/* El interletraje va en línea y no como utilidad: la regla base
+                `h1,h2,h3` de index.css vive fuera de las capas de Tailwind y
+                gana a `tracking-*`, que sí está dentro de una. */}
+            <h1
+              className="text-[2rem] font-extrabold leading-[1.05]"
+              style={{ letterSpacing: '-0.03em' }}
+            >
+              {restaurante.name}
+            </h1>
+            {/* Sin opacidad. La jerarquía sale del tamaño y el peso, porque el
+                color de marca lo elige cada restaurante: bajar la opacidad del
+                texto sobre un fondo cualquiera es apostar a que el contraste
+                aguante, y con un tono claro no aguanta. */}
+            {restaurante.address && (
+              <p className="mt-1.5 truncate text-sm font-medium">{restaurante.address}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Troquelado en vez de relleno: un fondo translúcido tiñe la tinta
+            con el color de la cabecera y le come contraste justo al dato que
+            confirma que estás pidiendo a tu mesa y no a la de al lado. */}
+        {mesa && (
+          <div className="mx-auto mt-6 max-w-2xl">
+            <p
+              className="inline-flex items-baseline gap-2.5 rounded-full border px-4 py-1.5"
+              style={{ borderColor: 'color-mix(in srgb, var(--tinta-marca, #fff) 45%, transparent)' }}
+            >
+              <span
+                className="text-micro font-semibold uppercase"
+                style={{ letterSpacing: '0.16em' }}
+              >
+                Mesa
+              </span>
+              <span className="cifras text-lg font-bold">{mesa.number}</span>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {restaurante.cover_url && (
+        <img
+          src={restaurante.cover_url}
+          alt=""
+          className="h-32 w-full object-cover sm:h-44"
+        />
+      )}
+    </header>
+  )
+}
+
+/**
+ * El rótulo de sección de una carta impresa: nombre, filete hasta el margen y
+ * el número de platos donde en el papel irían los puntos suspensivos hasta el
+ * precio. El número no es decoración — dice cuánto hay que recorrer antes de
+ * decidir.
+ */
+function RotuloSeccion({ nombre, platos }: { nombre: string; platos: number }) {
+  return (
+    <div className="mb-5 flex items-center gap-4">
+      <h2
+        className="text-micro font-bold uppercase text-marca-800"
+        style={{ letterSpacing: '0.18em' }}
+      >
+        {nombre}
+      </h2>
+      <span className="h-px flex-1 bg-piedra-300" />
+      <span className="cifras text-micro text-piedra-500">{platos}</span>
+    </div>
+  )
+}
+
+function Plato({
+  producto,
+  moneda,
+  deshabilitado,
+  onElegir,
+}: {
+  producto: ProductoPub
+  moneda: string
+  deshabilitado: boolean
+  onElegir: () => void
+}) {
+  return (
+    <button
+      onClick={onElegir}
+      disabled={deshabilitado}
+      className="group flex w-full items-start gap-4 border-b border-piedra-200 py-4 text-left
+                 last:border-b-0 disabled:opacity-55"
+    >
+      <FotoProducto
+        nombre={producto.name}
+        url={producto.image_url}
+        redondeo="rounded-lg"
+        className="h-[4.5rem] w-[4.5rem] shrink-0 text-xl"
+      />
+
+      <div className="min-w-0 flex-1 pt-0.5">
+        <p className="font-semibold leading-snug text-piedra-900">{producto.name}</p>
+        {producto.description && (
+          <p className="mt-1 line-clamp-2 text-sm leading-snug text-piedra-500">
+            {producto.description}
+          </p>
+        )}
+      </div>
+
+      <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
+        <span className="cifras font-bold text-piedra-900">{dinero(producto.price, moneda)}</span>
+        {!deshabilitado && (
+          <span
+            aria-hidden
+            className="flex h-8 w-8 items-center justify-center rounded-full border
+                       border-marca-300 text-lg font-bold text-marca-700
+                       group-hover:border-marca-600 group-hover:bg-marca-50"
+          >
+            +
+          </span>
+        )}
+      </div>
+    </button>
+  )
+}
+
+/**
+ * La barra de abajo, que es lo único que esta carta tiene y una impresa no
+ * puede tener.
+ *
+ * Hace dos trabajos en un solo sitio: lo que llevas puesto tú y lo que lleva la
+ * mesa entera. Separarlos en dos barras dejaría la mitad de un móvil ocupada
+ * por controles, así que la cuenta de la mesa pasa a ser una línea fina encima
+ * cuando además hay carrito.
+ */
+function BarraMesa({
+  unidades,
+  totalCarrito,
+  rondas,
+  totalMesa,
+  moneda,
+  onCarrito,
+  onComanda,
+}: {
+  unidades: number
+  totalCarrito: number
+  rondas: number
+  totalMesa: number
+  moneda: string
+  onCarrito: () => void
+  onComanda: () => void
+}) {
+  const previo = useRef(rondas)
+  const [avisa, setAvisa] = useState(false)
+
+  useEffect(() => {
+    // Creció sin que fuera cosa tuya: alguien más de la mesa acaba de pedir.
+    if (rondas > previo.current) {
+      setAvisa(true)
+      const t = setTimeout(() => setAvisa(false), 2200)
+      return () => clearTimeout(t)
+    }
+    previo.current = rondas
+  }, [rondas])
+
+  if (unidades === 0 && rondas === 0) return null
+
+  if (unidades === 0) {
+    return (
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-piedra-200 bg-white/95 p-3 backdrop-blur">
+        <button
+          onClick={onComanda}
+          className={`mx-auto flex w-full max-w-2xl items-center justify-between gap-3 rounded-xl
+                      border border-piedra-300 px-4 py-3 text-left transition-colors
+                      ${avisa ? 'border-marca-500 bg-marca-50' : ''}`}
+        >
+          <span>
+            <span className="block text-micro font-semibold uppercase tracking-[0.14em] text-piedra-500">
+              {avisa ? 'Alguien más acaba de pedir' : 'Cuenta de la mesa'}
+            </span>
+            <span className="text-sm font-medium text-piedra-800">
+              {rondas === 1 ? '1 pedido' : `${rondas} pedidos`}
+            </span>
+          </span>
+          <span className="cifras text-lg font-bold text-piedra-900">
+            {dinero(totalMesa, moneda)}
+          </span>
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30">
+      {rondas > 0 && (
+        <button
+          onClick={onComanda}
+          className="flex w-full items-center justify-center gap-2 border-t border-piedra-200
+                     bg-white/95 px-5 py-2 text-xs text-piedra-600 backdrop-blur"
+        >
+          La mesa lleva{' '}
+          <span className="cifras font-bold text-piedra-800">{dinero(totalMesa, moneda)}</span>
+          <span className="text-piedra-400">· ver</span>
+        </button>
+      )}
+
+      <button
+        onClick={onCarrito}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4"
+        style={{
+          background: 'var(--marca-pura, var(--color-marca-700))',
+          color: 'var(--tinta-marca, #ffffff)',
+        }}
+      >
+        <span
+          className="cifras flex h-8 w-8 items-center justify-center rounded-full border font-bold"
+          style={{ borderColor: 'color-mix(in srgb, var(--tinta-marca, #fff) 45%, transparent)' }}
+        >
+          {unidades}
+        </span>
+        <span className="font-semibold">Ver mi pedido</span>
+        <span className="cifras font-bold">{dinero(totalCarrito, moneda)}</span>
+      </button>
+    </div>
+  )
+}
+
+/** La cuenta de la mesa, ronda por ronda. */
+function HojaComanda({
+  rondas,
+  total,
+  moneda,
+  mesa,
+  reciente,
+  onCerrar,
+}: {
+  rondas: RondaMesa[]
+  total: number
+  moneda: string
+  mesa: string
+  reciente: number | null
+  onCerrar: () => void
+}) {
+  return (
+    <Hoja titulo={mesa ? `Mesa ${mesa}` : 'La cuenta'} onCerrar={onCerrar} cerrar="Seguir viendo">
+      <div className="flex-1 overflow-y-auto px-5 py-4">
+        {rondas.length === 0 ? (
+          <p className="py-10 text-center text-piedra-500">
+            Todavía no habéis pedido nada. Lo que pida cualquiera de la mesa aparece aquí.
+          </p>
+        ) : (
+          <ol className="flex flex-col gap-3">
+            {rondas.map((ronda) => {
+              const estado = ESTADO_COMENSAL[ronda.status]
+              const esTuyo = ronda.id === reciente
+
+              return (
+                <li
+                  key={ronda.id}
+                  className={`rounded-xl border p-4 ${
+                    esTuyo ? 'border-marca-500 bg-marca-50' : 'border-piedra-200 bg-white'
+                  }`}
+                >
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <span className="text-micro font-bold uppercase tracking-[0.14em] text-piedra-500">
+                      Pedido {ronda.round}
+                    </span>
+                    {ronda.diner_name && (
+                      <span className="text-sm font-semibold text-piedra-800">
+                        {ronda.diner_name}
+                      </span>
+                    )}
+                    {ronda.type === 'takeaway' && (
+                      <span className="rounded-full bg-piedra-200 px-2 py-0.5 text-micro font-semibold text-piedra-700">
+                        Para llevar
+                      </span>
+                    )}
+                    {estado && (
+                      <span
+                        className={`ml-auto rounded-full px-2.5 py-0.5 text-micro font-semibold ${estado.clase}`}
+                      >
+                        {estado.texto}
+                      </span>
+                    )}
+                  </div>
+
+                  <ul className="flex flex-col gap-1.5">
+                    {ronda.items.map((item, i) => (
+                      <li key={i} className="flex items-baseline gap-3 text-sm">
+                        <span className="cifras shrink-0 text-piedra-500">{item.quantity}×</span>
+                        <span className="min-w-0 flex-1 text-piedra-800">
+                          {item.name}
+                          {item.additionals.length > 0 && (
+                            <span className="text-piedra-500"> · {item.additionals.join(', ')}</span>
+                          )}
+                        </span>
+                        <span className="cifras shrink-0 text-piedra-600">
+                          {dinero(item.subtotal, moneda)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </div>
+
+      <footer className="border-t border-piedra-200 p-5">
+        <div className="mb-3 flex items-baseline justify-between">
+          <span className="font-semibold text-piedra-700">Total de la mesa</span>
+          <span className="cifras text-2xl font-bold text-piedra-900">{dinero(total, moneda)}</span>
+        </div>
+
+        <button
+          onClick={onCerrar}
+          className="min-h-13 w-full rounded-xl font-semibold"
+          style={{
+            background: 'var(--marca-pura, var(--color-marca-700))',
+            color: 'var(--tinta-marca, #ffffff)',
+          }}
+        >
+          Pedir algo más
+        </button>
+
+        <p className="mt-3 text-center text-xs text-piedra-500">
+          Se paga al final, todo junto, con el personal.
+        </p>
+      </footer>
+    </Hoja>
   )
 }
 
@@ -348,7 +770,7 @@ function HojaProducto({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-[92dvh] w-full max-w-lg flex-col flotante rounded-t-2xl bg-white sm:rounded-2xl">
+      <div className="flotante flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-2xl bg-white sm:rounded-2xl">
         <header className="border-b border-piedra-200 px-5 py-4">
           <h2 className="text-lg font-bold text-piedra-900">{producto.name}</h2>
           {producto.description && (
@@ -365,8 +787,7 @@ function HojaProducto({
                 <legend className="mb-2 flex items-center gap-2 font-semibold text-piedra-800">
                   {grupo.name}
                   {grupo.is_required && (
-                    <span className="rounded-full bg-pendiente-suave px-2 py-0.5 text-[11px]
-                                     font-semibold text-pendiente">
+                    <span className="rounded-full bg-pendiente-suave px-2 py-0.5 text-[11px] font-semibold text-pendiente">
                       Elige una
                     </span>
                   )}
@@ -379,12 +800,9 @@ function HojaProducto({
                     return (
                       <label
                         key={a.id}
-                        className={`flex min-h-13 cursor-pointer items-center gap-3 rounded-xl
-                                    border px-4 ${
-                                      marcado
-                                        ? 'border-marca-500 bg-marca-50'
-                                        : 'border-piedra-200'
-                                    }`}
+                        className={`flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border px-4 ${
+                          marcado ? 'border-marca-500 bg-marca-50' : 'border-piedra-200'
+                        }`}
                       >
                         <input
                           type={unico ? 'radio' : 'checkbox'}
@@ -429,8 +847,7 @@ function HojaProducto({
               onChange={(e) => setNotas(e.target.value)}
               rows={2}
               placeholder="Sin cebolla, poco picante…"
-              className="rounded-xl border border-piedra-300 px-3.5 py-2.5
-                         focus:border-marca-500 focus:outline-none"
+              className="rounded-xl border border-piedra-300 px-3.5 py-2.5 focus:border-marca-500 focus:outline-none"
             />
           </label>
         </div>
@@ -438,24 +855,24 @@ function HojaProducto({
         <footer className="border-t border-piedra-200 p-4">
           <div className="mb-3 flex items-center justify-between">
             <ContadorPub valor={cantidad} onCambio={setCantidad} />
-            <span className="cifras text-xl font-bold text-piedra-900">
-              {dinero(total, moneda)}
-            </span>
+            <span className="cifras text-xl font-bold text-piedra-900">{dinero(total, moneda)}</span>
           </div>
 
           <div className="flex gap-2">
             <button
               onClick={onCancelar}
-              className="min-h-13 flex-1 rounded-xl border border-piedra-300 font-semibold
-                         text-piedra-700"
+              className="min-h-13 flex-1 rounded-xl border border-piedra-300 font-semibold text-piedra-700"
             >
               Cancelar
             </button>
             <button
               onClick={() => onAgregar(seleccionados, notas, cantidad)}
               disabled={faltan.length > 0}
-              className="min-h-13 flex-[2] rounded-xl bg-marca-600 font-semibold text-white
-                         disabled:opacity-40"
+              className="min-h-13 flex-[2] rounded-xl font-semibold disabled:opacity-40"
+              style={{
+                background: 'var(--marca-pura, var(--color-marca-700))',
+                color: 'var(--tinta-marca, #ffffff)',
+              }}
             >
               {faltan.length > 0 ? `Elige ${faltan[0].name}` : 'Añadir'}
             </button>
@@ -472,6 +889,11 @@ function HojaCarrito({
   total,
   nota,
   onNota,
+  nombre,
+  onNombre,
+  tipo,
+  onTipo,
+  mesa,
   enviando,
   error,
   onCerrar,
@@ -483,6 +905,11 @@ function HojaCarrito({
   total: number
   nota: string
   onNota: (v: string) => void
+  nombre: string
+  onNombre: (v: string) => void
+  tipo: TipoPedidoQr
+  onTipo: (v: TipoPedidoQr) => void
+  mesa: string
   enviando: boolean
   error: string | null
   onCerrar: () => void
@@ -490,14 +917,7 @@ function HojaCarrito({
   onEnviar: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
-      <header className="flex items-center justify-between border-b border-piedra-200 px-5 py-4">
-        <h2 className="text-lg font-bold text-piedra-900">Mi pedido</h2>
-        <button onClick={onCerrar} className="font-medium text-piedra-500">
-          Seguir viendo
-        </button>
-      </header>
-
+    <Hoja titulo="Mi pedido" onCerrar={onCerrar} cerrar="Seguir viendo">
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <ul className="flex flex-col gap-3">
           {carrito.map((l) => {
@@ -512,7 +932,7 @@ function HojaCarrito({
                       {l.adicionales.map((a) => a.name).join(', ')}
                     </p>
                   )}
-                  {l.notas && <p className="text-sm text-pendiente italic">{l.notas}</p>}
+                  {l.notas && <p className="text-sm italic text-pendiente">{l.notas}</p>}
                   <p className="cifras mt-1 text-sm text-piedra-600">
                     {dinero((Number(l.producto.price) + extras) * l.cantidad, moneda)}
                   </p>
@@ -528,6 +948,51 @@ function HojaCarrito({
           })}
         </ul>
 
+        {/* Dónde se come. Va aquí y no por plato: cocina y empaquetado se
+            deciden por comanda, y partir una comanda en dos destinos es lo que
+            hace que llegue medio pedido frío. */}
+        <fieldset className="mt-6">
+          <legend className="mb-2 font-semibold text-piedra-800">¿Cómo lo servimos?</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ['dine_in', mesa ? `Aquí, mesa ${mesa}` : 'Aquí'],
+                ['takeaway', 'Para llevar'],
+              ] as [TipoPedidoQr, string][]
+            ).map(([valor, etiqueta]) => (
+              <button
+                key={valor}
+                type="button"
+                aria-pressed={tipo === valor}
+                onClick={() => onTipo(valor)}
+                className={`min-h-13 rounded-xl border px-3 font-semibold ${
+                  tipo === valor
+                    ? 'border-marca-600 bg-marca-50 text-marca-800'
+                    : 'border-piedra-300 text-piedra-600'
+                }`}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="mt-5 flex flex-col gap-1.5">
+          <span className="font-semibold text-piedra-800">
+            ¿Cómo te llamamos? <span className="font-normal text-piedra-500">(opcional)</span>
+          </span>
+          <input
+            value={nombre}
+            onChange={(e) => onNombre(e.target.value)}
+            maxLength={60}
+            placeholder="Ana"
+            className="rounded-xl border border-piedra-300 px-3.5 py-2.5 focus:border-marca-500 focus:outline-none"
+          />
+          <span className="text-xs text-piedra-500">
+            Si en la mesa pedís varios, así sabemos de quién es cada plato.
+          </span>
+        </label>
+
         <label className="mt-5 flex flex-col gap-1.5">
           <span className="font-semibold text-piedra-800">
             Nota para la cocina <span className="font-normal text-piedra-500">(opcional)</span>
@@ -537,15 +1002,17 @@ function HojaCarrito({
             onChange={(e) => onNota(e.target.value)}
             rows={2}
             placeholder="Todo junto, por favor…"
-            className="rounded-xl border border-piedra-300 px-3.5 py-2.5
-                       focus:border-marca-500 focus:outline-none"
+            className="rounded-xl border border-piedra-300 px-3.5 py-2.5 focus:border-marca-500 focus:outline-none"
           />
         </label>
       </div>
 
       <footer className="border-t border-piedra-200 p-5">
         {error && (
-          <p role="alert" className="mb-3 rounded-lg bg-cancelado-suave px-3 py-2 text-sm text-cancelado">
+          <p
+            role="alert"
+            className="mb-3 rounded-lg bg-cancelado-suave px-3 py-2 text-sm text-cancelado"
+          >
             {error}
           </p>
         )}
@@ -558,16 +1025,50 @@ function HojaCarrito({
         <button
           onClick={onEnviar}
           disabled={enviando || carrito.length === 0}
-          className="min-h-14 w-full rounded-xl bg-marca-600 text-base font-semibold text-white
-                     disabled:opacity-40"
+          className="min-h-14 w-full rounded-xl text-base font-semibold disabled:opacity-40"
+          style={{
+            background: 'var(--marca-pura, var(--color-marca-700))',
+            color: 'var(--tinta-marca, #ffffff)',
+          }}
         >
-          {enviando ? 'Enviando…' : 'Enviar a cocina'}
+          {enviando ? 'Enviando…' : 'Enviar el pedido'}
         </button>
 
         <p className="mt-2 text-center text-xs text-piedra-500">
           Se paga al final, con el personal.
         </p>
       </footer>
+    </Hoja>
+  )
+}
+
+/** Pantalla completa con cabecera y salida, que es como se usan las dos hojas. */
+function Hoja({
+  titulo,
+  cerrar,
+  onCerrar,
+  children,
+}: {
+  titulo: string
+  cerrar: string
+  onCerrar: () => void
+  children: React.ReactNode
+}) {
+  useEffect(() => {
+    const alPulsar = (e: KeyboardEvent) => e.key === 'Escape' && onCerrar()
+    window.addEventListener('keydown', alPulsar)
+    return () => window.removeEventListener('keydown', alPulsar)
+  }, [onCerrar])
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label={titulo} className="fixed inset-0 z-50 flex flex-col bg-white">
+      <header className="flex items-center justify-between border-b border-piedra-200 px-5 py-4">
+        <h2 className="text-lg font-bold text-piedra-900">{titulo}</h2>
+        <button onClick={onCerrar} className="font-medium text-piedra-500">
+          {cerrar}
+        </button>
+      </header>
+      {children}
     </div>
   )
 }
@@ -604,36 +1105,22 @@ function ContadorPub({
 
 function Cargando() {
   return (
-    <div className="min-h-dvh bg-piedra-50 p-4">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-6 h-12 animate-pulse rounded-xl bg-piedra-200" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="mb-2 h-24 animate-pulse rounded-2xl bg-piedra-200" />
+    <div className="min-h-dvh bg-piedra-50">
+      <div className="h-44 animate-pulse bg-piedra-200" />
+      <div className="mx-auto max-w-2xl px-5 pt-8">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="mb-4 h-20 animate-pulse rounded-lg bg-piedra-200" />
         ))}
       </div>
     </div>
   )
 }
 
-function Centrado({
-  emoji,
-  titulo,
-  texto,
-  children,
-}: {
-  emoji: string
-  titulo: string
-  texto: string
-  children?: React.ReactNode
-}) {
+function Centrado({ titulo, texto }: { titulo: string; texto: string }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-piedra-50 p-6 text-center">
-      <p className="text-5xl" aria-hidden>
-        {emoji}
-      </p>
-      <h1 className="mt-3 text-xl font-bold text-piedra-900">{titulo}</h1>
-      <p className="mt-1 max-w-sm text-piedra-500">{texto}</p>
-      {children}
+      <h1 className="text-xl font-bold text-piedra-900">{titulo}</h1>
+      <p className="mt-2 max-w-sm text-piedra-500">{texto}</p>
     </div>
   )
 }

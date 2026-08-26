@@ -38,6 +38,12 @@ Route::post('/broadcasting/auth', [BroadcastController::class, 'auth'])
 // Menú público — cliente escanea QR, no necesita token
 Route::get('/menu/{restaurantSlug}', [MenuController::class, 'public'])->middleware('throttle:60,1');
 
+// Lo que la mesa lleva pedido, para el propio comensal. El código del QR hace
+// de credencial: quien lo tiene está sentado en esa mesa. Se consulta en bucle
+// mientras la carta está abierta, así que el límite es más holgado.
+Route::get('/menu/{restaurantSlug}/mesa/{qrCode}', [MenuController::class, 'tableState'])
+    ->middleware('throttle:120,1');
+
 // Crear pedidos sin autenticar necesita freno: es la ruta más abusable.
 Route::post('/orders/qr', [OrderController::class, 'storeFromQr'])->middleware('throttle:10,1');
 
@@ -84,6 +90,9 @@ Route::middleware(['auth:sanctum', 'restaurant.scope'])->group(function () {
     // Pagos
     Route::get('/payments',  [PaymentController::class, 'index']);
     Route::post('/payments', [PaymentController::class, 'store']);
+    // Una mesa con varios comensales acumula varios pedidos; cobrarlos de uno
+    // en uno obligaba a la caja a cuadrar el total a mano.
+    Route::post('/payments/table/{table}', [PaymentController::class, 'storeForTable']);
 
     // Reportes
     Route::middleware('plan.feature:reports')->group(function () {

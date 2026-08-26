@@ -188,6 +188,9 @@ export type Ajustes = {
     city: string | null
     country: string | null
     logo_url: string | null
+    /** Marca de la carta del QR. Hex del que se deriva su paleta. */
+    brand_color: string | null
+    cover_url: string | null
     currency: string
     timezone: string
   }
@@ -220,15 +223,23 @@ export type Usuario = {
 export const gestionAjustes = {
   leer: async () => (await api.get<Ajustes>('/settings')).data,
 
-  guardar: async (datos: Record<string, unknown>, logo?: File | null) => {
-    if (!logo) {
+  guardar: async (
+    datos: Record<string, unknown>,
+    archivos: { logo?: File | null; cover?: File | null } = {},
+  ) => {
+    const adjuntos = Object.entries(archivos).filter((par): par is [string, File] => Boolean(par[1]))
+
+    if (adjuntos.length === 0) {
       return (await api.put<Ajustes>('/settings', datos)).data
     }
 
     // Con archivo hay que ir por POST + _method: PHP no parsea multipart en PUT.
     const cuerpo = new FormData()
     cuerpo.append('_method', 'PUT')
-    cuerpo.append('logo', logo)
+
+    for (const [campo, archivo] of adjuntos) {
+      cuerpo.append(campo, archivo)
+    }
 
     for (const [clave, valor] of Object.entries(datos)) {
       if (valor === null || valor === undefined) continue

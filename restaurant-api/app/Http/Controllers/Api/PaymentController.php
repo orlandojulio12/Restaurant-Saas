@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Restaurant;
+use App\Models\RestaurantTable;
 use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -111,6 +112,112 @@ class PaymentController extends Controller
         return response()->json([
             'payment' => $payment,
             'order'   => $order->fresh()->load(['items.additionals', 'table', 'customer']),
+        ], 201);
+    }
+
+    /**
+     * Cobrar de una vez todo lo que lleva una mesa.
+     *
+     * Con el QR, cada comensal manda su propio pedido: una mesa de cuatro puede
+     * acumular cuatro pedidos y hasta ahora la caja tenía que cobrarlos uno a
+     * uno y sumar el total a mano.
+     *
+     * Sigue habiendo un pago por pedido —`payments.order_id` no es nulable y
+     * los reportes cuentan por pedido—, pero se crean juntos y en una sola
+     * transacción. El vuelto se calcula sobre el total de la mesa y se carga en
+     * el último, de forma que `amount - change_amount` sigue siendo el total de
+     * cada pedido, igual que en un cobro suelto.
+     */
+    public function storeForTable(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $restaurantId = (int) $request->input('restaurant_id');
+
+        abort_if($table->restaurant_id !== $restaurantId, 403);
+
+        $data = $request->validate([
+            'method'    => ['required', 'in:cash,card,nequi,daviplata,bancolombia,transfer,other'],
+            'amount'    => ['required', 'numeric', 'min:0'],
+            'reference' => ['nullable', 'string', 'max:100'],
+            'notes'     => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $abiertos = Order::with('payment')
+            ->where('restaurant_id', $restaurantId)
+            ->where('table_id', $table->id)
+            ->whereIn('status', Order::ACTIVOS)
+            ->oldest()
+            ->get();
+
+        // Una propuesta del QR no está confirmada por nadie: cobrarla sería dar
+        // por buena una comanda que el mesero todavía no ha mirado. Y dejarla
+        // fuera del cobro tampoco sirve, porque la mesa quedaría ocupada por un
+        // pedido pendiente justo después de pagar.
+        $propuestos = $abiertos->where('status', 'proposed');
+
+        if ($propuestos->isNotEmpty()) {
+            return response()->json([
+                'message'  => 'La mesa tiene pedidos sin confirmar. Confírmalos o descártalos antes de cobrar.',
+                'proposed' => $propuestos->pluck('id')->values(),
+            ], 422);
+        }
+
+        $cobrables = $abiertos->filter(fn(Order $o) => !$o->payment)->values();
+
+        if ($cobrables->isEmpty()) {
+            return response()->json(['message' => 'Esta mesa no tiene nada pendiente de cobro.'], 422);
+        }
+
+        $total    = round($cobrables->sum(fn(Order $o) => (float) $o->total), 2);
+        $recibido = (float) $data['amount'];
+
+        // Misma tolerancia de un peso que en el cobro suelto, para absorber el
+        // redondeo del cliente.
+        if ($recibido + 0.01 < $total) {
+            return response()->json([
+                'message'  => 'El monto recibido no cubre el total de la mesa.',
+                'total'    => $total,
+                'received' => round($recibido, 2),
+                'orders'   => $cobrables->pluck('id')->values(),
+            ], 422);
+        }
+
+        $sobrante = round($recibido - $total, 2);
+        $ultimo   = $cobrables->count() - 1;
+
+        $pagos = DB::transaction(function () use ($cobrables, $data, $restaurantId, $request, $sobrante, $ultimo) {
+            return $cobrables->map(function (Order $order, int $i) use ($data, $restaurantId, $request, $sobrante, $ultimo) {
+                $excedente = $i === $ultimo ? $sobrante : 0;
+
+                return Payment::create([
+                    'restaurant_id' => $restaurantId,
+                    'order_id'      => $order->id,
+                    'cashier_id'    => $request->user()?->id,
+                    'method'        => $data['method'],
+                    'amount'        => round((float) $order->total + $excedente, 2),
+                    // El vuelto solo tiene sentido en efectivo.
+                    'change_amount' => $data['method'] === 'cash' ? $excedente : 0,
+                    'reference'     => $data['reference'] ?? null,
+                    'status'        => 'completed',
+                    'notes'         => $data['notes'] ?? null,
+                ]);
+            })->all();
+        });
+
+        // Fuera de la transacción, como en el cobro suelto: cerrar descuenta
+        // inventario y emite eventos. La mesa se libera sola al cerrar el
+        // último, porque `close()` mira si queda algo abierto.
+        foreach ($cobrables as $order) {
+            if ($order->status !== 'closed') {
+                $this->orders->close($order);
+            }
+        }
+
+        return response()->json([
+            'payments' => $pagos,
+            'total'    => $total,
+            'change'   => $data['method'] === 'cash' ? $sobrante : 0,
+            'orders'   => $cobrables->pluck('id')->values(),
+            'table'    => ['id' => $table->id, 'number' => $table->number, 'status' => $table->fresh()->status],
         ], 201);
     }
 }

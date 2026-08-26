@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Order;
 use App\Models\Restaurant;
 use App\Models\RestaurantTable;
 use Illuminate\Http\JsonResponse;
@@ -43,10 +44,15 @@ class MenuController extends Controller
 
         return response()->json([
             'restaurant' => [
-                'id'       => $restaurant->id,
-                'name'     => $restaurant->name,
-                'logo_url' => $restaurant->logo_url,
-                'currency' => $restaurant->currency,
+                'id'          => $restaurant->id,
+                'name'        => $restaurant->name,
+                'logo_url'    => $restaurant->logo_url,
+                // Nulos mientras el restaurante no configure su marca; la carta
+                // cae entonces en la paleta por defecto.
+                'brand_color' => $restaurant->brand_color,
+                'cover_url'   => $restaurant->cover_url,
+                'address'     => $restaurant->address,
+                'currency'    => $restaurant->currency,
             ],
             // null si el QR no corresponde a ninguna mesa de este restaurante.
             'table'      => $mesa,
@@ -74,6 +80,63 @@ class MenuController extends Controller
                     ]),
                 ]),
             ]),
+        ]);
+    }
+
+    /**
+     * Lo que la mesa lleva pedido, para el propio comensal.
+     *
+     * Sin esto cada móvil pide a ciegas: tres personas sentadas juntas escanean
+     * el mismo código, cada una arma su carrito por su cuenta y ninguna ve lo
+     * que ya mandaron las demás. El resultado son limonadas duplicadas y gente
+     * preguntándole al mesero si su plato entró.
+     *
+     * Se identifica por el código del QR, no por el id de la mesa: quien tiene
+     * el código está sentado ahí. Aun así solo salen líneas, estados y totales
+     * —nunca el teléfono ni el nombre del cliente registrado—, porque el código
+     * está impreso a la vista de cualquiera que pase.
+     */
+    public function tableState(string $restaurantSlug, string $qrCode): JsonResponse
+    {
+        $restaurant = Restaurant::where('slug', $restaurantSlug)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $mesa = RestaurantTable::where('restaurant_id', $restaurant->id)
+            ->where('qr_code', $qrCode)
+            ->firstOrFail();
+
+        // La cuenta abierta de la mesa son sus pedidos activos: al cobrar pasan
+        // a 'closed' y desaparecen de aquí solos. No hace falta más sesión.
+        $pedidos = Order::with('items.additionals')
+            ->where('restaurant_id', $restaurant->id)
+            ->where('table_id', $mesa->id)
+            ->whereIn('status', Order::ACTIVOS)
+            ->oldest()
+            ->get();
+
+        return response()->json([
+            'table'  => ['id' => $mesa->id, 'number' => $mesa->number],
+            'orders' => $pedidos->values()->map(fn($pedido, $i) => [
+                'id'         => $pedido->id,
+                // Número de ronda dentro de la mesa, que es como lo cuenta el
+                // comensal: "lo que pedimos primero" y no el id global.
+                'round'      => $i + 1,
+                'status'     => $pedido->status,
+                'type'       => $pedido->type,
+                'diner_name' => $pedido->diner_name,
+                'total'      => $pedido->total,
+                'created_at' => $pedido->created_at,
+                'items'      => $pedido->items->map(fn($item) => [
+                    'name'        => $item->product_name,
+                    'quantity'    => $item->quantity,
+                    'subtotal'    => $item->subtotal,
+                    'additionals' => $item->additionals->pluck('additional_name'),
+                ]),
+            ]),
+            // Sin impuestos ni descuentos: es una referencia para el comensal,
+            // no la cuenta definitiva. Esa la cierra la caja.
+            'total'  => round($pedidos->sum(fn($p) => (float) $p->total), 2),
         ]);
     }
 }

@@ -180,6 +180,51 @@ Al pasar a `closed`: si no quedan pedidos activos en la mesa, la mesa vuelve a `
 
 Nota: el enum de la migración incluye además `paid`, que ninguna transición usa.
 
+## La mesa es la cuenta compartida
+
+Con el QR, **cada comensal manda su propio pedido**: cuatro personas sentadas
+juntas escanean el mismo adhesivo y salen cuatro `orders` con el mismo
+`table_id`. No hay tabla de sesión ni concepto nuevo — la cuenta abierta de la
+mesa son sus pedidos en `Order::ACTIVOS`, y al cobrarlos pasan a `closed` y
+desaparecen solos. La sesión es implícita y se cierra sola.
+
+De ahí salen tres reglas que es fácil romper:
+
+- **`GET /menu/{slug}/mesa/{qrCode}`** (público) devuelve lo que lleva la mesa
+  para el propio comensal. El código del QR hace de credencial: quien lo tiene
+  está sentado ahí. Aun así solo salen líneas, estados y totales — nunca el
+  teléfono ni el nombre del cliente registrado, porque el código está impreso a
+  la vista de cualquiera que pase.
+- **`TableResource` agrega por mesa.** `active_order` es *el que reclama
+  atención* (una propuesta sin confirmar si la hay, si no el más viejo), no "el"
+  pedido. El dinero va en `active_total` y el conteo en `active_orders_count`:
+  con el total de un solo pedido, el plano de sala decía que la mesa debía
+  50.000 cuando debía el triple.
+- **`POST /payments/table/{table}`** cobra todos los pedidos de la mesa a la vez.
+  Sigue habiendo un `Payment` por pedido —`payments.order_id` no es nulable— pero
+  se crean en una transacción, el vuelto se calcula sobre el total de la mesa y
+  se carga en el último, de forma que `amount - change_amount` sigue siendo el
+  total de cada pedido. **Rechaza cobrar si hay propuestas sin confirmar**: sería
+  dar por buena una comanda que el mesero no ha mirado, y dejarla fuera del cobro
+  tampoco sirve porque la mesa quedaría ocupada justo después de pagar.
+
+## Tipos de pedido
+
+`orders.type` es `dine_in | delivery | counter | takeaway`.
+
+`counter` es la venta de barra: nadie ocupa una mesa. **`takeaway` es la mesa que
+se lleva parte de lo que pidió** — conserva su `table_id`, entra en la misma
+cuenta y ocupa la mesa igual, porque la gente sigue sentada mientras espera.
+Mezclarlo con `counter` contaría como venta de mostrador algo que se consumió en
+salón y desplazaría los reportes.
+
+Desde el QR el comensal solo puede elegir entre los de `Order::TIPOS_QR`
+(`dine_in`, `takeaway`): un domicilio o un pedido de barra los abre el personal.
+
+`OrderService::create` marca la mesa ocupada **cuando el pedido tiene
+`table_id`**, sin mirar el tipo. Comprobar `type === 'dine_in'` dejaba sin marcar
+la mesa de un `takeaway` pedido desde el salón.
+
 ## Modelo de datos
 
 25 migraciones, prefijo `2026_04_01_0101xx`, en orden de dependencias:

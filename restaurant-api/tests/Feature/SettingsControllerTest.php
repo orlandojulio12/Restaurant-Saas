@@ -168,4 +168,46 @@ class SettingsControllerTest extends TestCase
         $this->assertNotSame($url, $segunda->json('restaurant.logo_url'));
         Storage::disk('public')->assertMissing($path);
     }
+
+    public function test_guarda_el_color_y_la_portada_de_la_carta(): void
+    {
+        $response = $this->post('/api/settings', [
+            '_method'     => 'PUT',
+            'brand_color' => '#B4472A',
+            'cover'       => UploadedFile::fake()->image('fachada.jpg'),
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        $this->assertSame('#B4472A', $response->json('restaurant.brand_color'));
+
+        $url  = $response->json('restaurant.cover_url');
+        $path = substr($url, strpos($url, '/storage/') + strlen('/storage/'));
+        Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_rechaza_un_color_de_marca_que_no_sea_hex(): void
+    {
+        // De este valor sale la paleta entera de la carta pública; uno raro
+        // rompería el render en el móvil del comensal, no en el panel.
+        $this->putJson('/api/settings', ['brand_color' => 'rojo'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('brand_color');
+
+        $this->putJson('/api/settings', ['brand_color' => '#FFF'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('brand_color');
+    }
+
+    public function test_el_logo_y_la_portada_no_se_pisan(): void
+    {
+        $response = $this->post('/api/settings', [
+            '_method' => 'PUT',
+            'logo'    => UploadedFile::fake()->image('logo.png'),
+            'cover'   => UploadedFile::fake()->image('portada.jpg'),
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        $this->assertNotSame(
+            $response->json('restaurant.logo_url'),
+            $response->json('restaurant.cover_url'),
+        );
+    }
 }

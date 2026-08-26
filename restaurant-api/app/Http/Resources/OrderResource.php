@@ -21,6 +21,7 @@ class OrderResource extends JsonResource
             'discount_amount'  => $this->discount_amount,
             'total'            => $this->total,
             'notes'            => $this->notes,
+            'diner_name'       => $this->diner_name,
             'confirmed_at'     => $this->confirmed_at,
             'preparing_at'     => $this->preparing_at,
             'ready_at'         => $this->ready_at,

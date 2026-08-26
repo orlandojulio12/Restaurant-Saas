@@ -33,7 +33,16 @@ export default function Cobrar() {
   const [metodo, setMetodo] = useState<MetodoPago>('cash')
   const [recibido, setRecibido] = useState('')
   const [referencia, setReferencia] = useState('')
-  const [cobrado, setCobrado] = useState<{ vuelto: number; pedido: Pedido } | null>(null)
+  const [alcance, setAlcance] = useState<'pedido' | 'mesa'>('pedido')
+  // Guarda también qué se cobró. Al cerrar la mesa desaparecen sus pedidos
+  // abiertos, así que `porMesa` vuelve a false justo antes de pintar el
+  // resultado y la pantalla final decía "Pedido cobrado" tras cobrar la mesa.
+  const [cobrado, setCobrado] = useState<{
+    vuelto: number
+    pedido: Pedido
+    deLaMesa: boolean
+    cuantos: number
+  } | null>(null)
 
   const { data: pedido, isLoading } = useQuery({
     queryKey: ['pedido', pedidoId],
@@ -41,7 +50,30 @@ export default function Cobrar() {
     enabled: Number.isFinite(pedidoId),
   })
 
-  const total = Number(pedido?.total ?? 0)
+  const mesaId = pedido?.table?.id ?? null
+
+  // Desde que cada comensal pide por su cuenta con el QR, una mesa puede tener
+  // varios pedidos abiertos. Cobrarlos de uno en uno obliga al cajero a sumar
+  // el total a mano y a repetir el cobro tantas veces como móviles haya.
+  const { data: pedidosMesa } = useQuery({
+    queryKey: ['mesa-pedidos', mesaId],
+    queryFn: async () => (await api.get<Pedido[]>(`/tables/${mesaId}/orders`)).data,
+    enabled: mesaId !== null,
+  })
+
+  const cobrables = useMemo(
+    () => (pedidosMesa ?? []).filter((p) => !p.payment && p.status !== 'cancelled'),
+    [pedidosMesa],
+  )
+  const hayVariosEnLaMesa = cobrables.length > 1
+  const porMesa = alcance === 'mesa' && hayVariosEnLaMesa
+
+  // Una propuesta sin confirmar no se puede cobrar: el mesero todavía no la ha
+  // mirado. El backend lo rechaza, y avisarlo aquí evita el viaje.
+  const sinConfirmar = cobrables.filter((p) => p.status === 'proposed')
+
+  const totalMesa = cobrables.reduce((s, p) => s + Number(p.total), 0)
+  const total = porMesa ? totalMesa : Number(pedido?.total ?? 0)
   const esEfectivo = metodo === 'cash'
 
   // En efectivo se teclea lo que entrega el cliente; en los demás métodos el
@@ -54,19 +86,34 @@ export default function Cobrar() {
 
   const cobrar = useMutation({
     mutationFn: async () => {
+      if (porMesa) {
+        const { data } = await api.post(`/payments/table/${mesaId}`, {
+          method: metodo,
+          amount: importe,
+          reference: referencia || null,
+        })
+        return { vuelto: Number((data as { change: number }).change) }
+      }
+
       const { data } = await api.post('/payments', {
         order_id: pedidoId,
         method: metodo,
         amount: importe,
         reference: referencia || null,
       })
-      return data as { payment: { change_amount: string }; order: Pedido }
+      return { vuelto: Number((data as { payment: { change_amount: string } }).payment.change_amount) }
     },
     onSuccess: (data) => {
       clienteQuery.invalidateQueries({ queryKey: ['mesas'] })
       clienteQuery.invalidateQueries({ queryKey: ['pedidos'] })
       clienteQuery.invalidateQueries({ queryKey: ['pedido', pedidoId] })
-      setCobrado({ vuelto: Number(data.payment.change_amount), pedido: data.order })
+      clienteQuery.invalidateQueries({ queryKey: ['mesa-pedidos', mesaId] })
+      setCobrado({
+        vuelto: data.vuelto,
+        pedido: pedido as Pedido,
+        deLaMesa: porMesa,
+        cuantos: cobrables.length,
+      })
     },
   })
 
@@ -94,9 +141,15 @@ export default function Cobrar() {
           <p className="text-4xl" aria-hidden>
             ✅
           </p>
-          <h1 className="mt-2 text-xl font-bold text-piedra-900">Pedido cobrado</h1>
+          <h1 className="mt-2 text-xl font-bold text-piedra-900">
+            {cobrado.deLaMesa ? 'Mesa cobrada' : 'Pedido cobrado'}
+          </h1>
           <p className="text-sm text-piedra-500">
-            {pedido.table ? `Mesa ${pedido.table.number} liberada` : TIPOS[pedido.type]}
+            {cobrado.deLaMesa
+              ? `${cobrado.cuantos} pedidos · mesa ${pedido.table?.number} liberada`
+              : pedido.table
+                ? `Mesa ${pedido.table.number} liberada`
+                : TIPOS[pedido.type]}
           </p>
 
           {cobrado.vuelto > 0 && (
@@ -142,17 +195,65 @@ export default function Cobrar() {
         ← Volver
       </button>
 
+      {/* Qué se está cobrando. Solo aparece cuando de verdad hay más de un
+          pedido abierto en la mesa: en el caso normal no hay nada que elegir y
+          una pregunta de más entre el cajero y el dinero sobra. */}
+      {hayVariosEnLaMesa && (
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          {(
+            [
+              ['pedido', `Solo el #${pedido.id}`, Number(pedido.total)],
+              ['mesa', `Toda la mesa ${pedido.table?.number ?? ''}`, totalMesa],
+            ] as ['pedido' | 'mesa', string, number][]
+          ).map(([valor, etiqueta, importeAlcance]) => (
+            <button
+              key={valor}
+              onClick={() => {
+                setAlcance(valor)
+                setRecibido('')
+              }}
+              aria-pressed={alcance === valor}
+              className={`min-h-16 rounded-xl border-2 px-3 py-2 text-left ${
+                alcance === valor
+                  ? 'border-marca-600 bg-marca-50'
+                  : 'border-piedra-200 bg-white'
+              }`}
+            >
+              <span className="block text-xs font-semibold text-piedra-600">{etiqueta}</span>
+              <span className="cifras block font-bold text-piedra-900">
+                {dinero(importeAlcance, moneda)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <header className="mb-4 rounded-2xl border border-piedra-200 bg-white p-5 text-center">
         <p className="text-sm text-piedra-500">
-          {pedido.table ? `Mesa ${pedido.table.number}` : TIPOS[pedido.type]} · Pedido #{pedido.id}
+          {porMesa
+            ? `Mesa ${pedido.table?.number} · ${cobrables.length} pedidos`
+            : `${pedido.table ? `Mesa ${pedido.table.number}` : TIPOS[pedido.type]} · Pedido #${pedido.id}`}
         </p>
         <p className="cifras mt-1 text-4xl font-bold text-piedra-900">
           {dinero(total, moneda)}
         </p>
         <p className="cifras text-xs text-piedra-500">
-          {pedido.items.length} línea{pedido.items.length === 1 ? '' : 's'}
+          {porMesa
+            ? cobrables.map((p) => p.diner_name).filter(Boolean).join(' · ') || 'Cuenta de la mesa'
+            : `${pedido.items.length} línea${pedido.items.length === 1 ? '' : 's'}`}
         </p>
       </header>
+
+      {porMesa && sinConfirmar.length > 0 && (
+        <p
+          role="alert"
+          className="mb-3 rounded-lg bg-pendiente-suave px-3 py-2 text-sm text-pendiente"
+        >
+          La mesa tiene {sinConfirmar.length} pedido{sinConfirmar.length === 1 ? '' : 's'} sin
+          confirmar (#{sinConfirmar.map((p) => p.id).join(', #')}). Confírmalos o descártalos antes
+          de cobrar.
+        </p>
+      )}
 
       <section className="mb-4">
         <h2 className="mb-2 text-sm font-semibold text-piedra-700">¿Cómo paga?</h2>
@@ -269,11 +370,13 @@ export default function Cobrar() {
 
       <button
         onClick={() => cobrar.mutate()}
-        disabled={!alcanza || cobrar.isPending}
+        disabled={!alcanza || cobrar.isPending || (porMesa && sinConfirmar.length > 0)}
         className="min-h-14 w-full rounded-xl bg-marca-600 text-base font-semibold text-white
                    transition hover:bg-marca-700 disabled:opacity-40"
       >
-        {cobrar.isPending ? 'Cobrando…' : `Cobrar ${dinero(total, moneda)} y cerrar`}
+        {cobrar.isPending
+          ? 'Cobrando…'
+          : `Cobrar ${dinero(total, moneda)} y cerrar ${porMesa ? 'la mesa' : 'el pedido'}`}
       </button>
 
       <p className="mt-2 text-center text-xs text-piedra-500">

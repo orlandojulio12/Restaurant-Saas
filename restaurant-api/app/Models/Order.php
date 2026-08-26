@@ -21,6 +21,14 @@ class Order extends Model
     /** Los que ya no se mueven. */
     public const TERMINALES = ['closed', 'cancelled'];
 
+    /**
+     * Tipos que un comensal puede elegir desde el QR de su mesa.
+     *
+     * `delivery` y `counter` quedan fuera a propósito: los abre el personal, no
+     * quien está sentado en el salón.
+     */
+    public const TIPOS_QR = ['dine_in', 'takeaway'];
+
     protected $fillable = [
         'restaurant_id',
         'table_id',
@@ -40,6 +48,7 @@ class Order extends Model
         'delivered_at',
         'closed_at',
         'notes',
+        'diner_name',
     ];
 
     protected function casts(): array

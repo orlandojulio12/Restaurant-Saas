@@ -20,6 +20,8 @@ class Restaurant extends Model
         'city',
         'country',
         'logo_url',
+        'brand_color',
+        'cover_url',
         'currency',
         'timezone',
         'is_active',

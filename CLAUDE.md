@@ -65,7 +65,24 @@ las ventas de la noche caen en el día siguiente.
 **Los estados del pedido son un contrato compartido.** La máquina de estados vive en
 `OrderController::TRANSITIONS` y el frontend la replica en `lib/formato.ts` solo
 para no ofrecer botones que darían 422. Al añadir un estado hay que tocar ambos, más
-`Order::ACTIVOS`.
+`Order::ACTIVOS`. Lo mismo con los tipos: `TIPOS` en `formato.ts` es un
+`Record<TipoPedido, string>`, así que ampliar el enum rompe la compilación hasta
+que se le pone etiqueta — que es justo lo que debe pasar.
+
+**La mesa es la cuenta, no el pedido.** Con el QR cada comensal manda el suyo, así
+que una mesa acumula varios `orders` a la vez. Cualquier pantalla que muestre "lo
+que debe la mesa" tiene que sumar sus pedidos activos (`active_total` en
+`TableResource`), no leer uno. Y cobrar va por `POST /payments/table/{table}`, que
+los cierra todos juntos. Ver *La mesa es la cuenta compartida* en el CLAUDE.md del
+backend.
+
+**La carta pública lleva la marca del restaurante, no la del producto.** El hex de
+`restaurants.brand_color` se convierte en la paleta entera en `lib/paleta.ts` y se
+inyecta como variables CSS sobre el contenedor de la carta: `bg-marca-600` ya es
+`var(--color-marca-600)`, así que recolorear no toca una sola clase. La cabecera usa
+el hex exacto que eligieron —un peso derivado convertiría un amarillo de marca en
+oliva— y el color del texto encima **se decide midiendo contraste**, nunca dando por
+hecho que la marca es oscura.
 
 ## Estado
 

@@ -135,5 +135,46 @@ class TableElapsedTest extends TestCase
         $mesa = $this->getJson('/api/tables')->assertOk()->json('0');
 
         $this->assertNull($mesa['active_order']);
+        $this->assertSame(0, $mesa['active_orders_count']);
+    }
+
+    public function test_el_total_de_la_mesa_suma_todos_sus_pedidos(): void
+    {
+        // Tres comensales pidiendo desde sus propios móviles a la misma mesa.
+        $this->pedidoDeHace(30);
+        $this->pedidoDeHace(20);
+        $this->pedidoDeHace(10);
+
+        $mesa = $this->getJson('/api/tables')->assertOk()->json('0');
+
+        // Con el total de un solo pedido, el plano de sala decía que la mesa
+        // debía 50.000 cuando debía el triple.
+        $this->assertSame(3, $mesa['active_orders_count']);
+        $this->assertSame('150000.00', $mesa['active_total']);
+        $this->assertSame('50000.00', $mesa['active_order']['total']);
+    }
+
+    public function test_una_propuesta_sin_confirmar_manda_sobre_el_reloj(): void
+    {
+        $viejo = $this->pedidoDeHace(40);
+        $propuesto = $this->pedidoDeHace(5);
+        $propuesto->update(['status' => 'proposed']);
+
+        $mesa = $this->getJson('/api/tables')->assertOk()->json('0');
+
+        // Es lo único de esa pantalla que espera a que el mesero haga algo, así
+        // que es lo que la tarjeta tiene que destacar aunque sea más reciente.
+        $this->assertSame($propuesto->id, $mesa['active_order']['id']);
+        $this->assertNotSame($viejo->id, $mesa['active_order']['id']);
+    }
+
+    public function test_sin_propuestas_destaca_el_pedido_mas_viejo(): void
+    {
+        $viejo = $this->pedidoDeHace(40);
+        $this->pedidoDeHace(5);
+
+        $mesa = $this->getJson('/api/tables')->assertOk()->json('0');
+
+        $this->assertSame($viejo->id, $mesa['active_order']['id']);
     }
 }

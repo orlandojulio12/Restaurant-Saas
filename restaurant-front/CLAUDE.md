@@ -67,10 +67,44 @@ curso" que lo olvide deja mesas ocupadas sin mostrar su pedido.
 `api/client.ts`). Sin eso, un token viejo en el móvil de un cliente lo expulsaba
 del menú del QR a una pantalla de login que no le corresponde.
 
+## La carta del QR (`features/publico`)
+
+La única pantalla que ve el cliente final, y la que más se aparta del resto.
+
+**Es del restaurante, no del producto.** `lib/paleta.ts` deriva los once pesos de
+`marca-*` del hex que eligió el administrador y los inyecta como variables CSS en
+el contenedor de la carta. El cálculo va en OKLCH y no en HSL: bajar la luminosidad
+en HSL apaga unos tonos mucho más que otros, y con restaurantes eligiendo colores
+arbitrarios a algunos les saldría una carta descolorida. Se resuelve en JS y no con
+`oklch(from …)` porque el público de esta pantalla es un móvil cualquiera.
+
+Dos reglas de esa cabecera, las dos aprendidas midiendo:
+
+- **La cabecera usa el hex exacto**, no un peso derivado. Un amarillo de marca al
+  70 % de oscuridad es un verde oliva: correcto en OKLCH y sin nada que ver con lo
+  que escogieron.
+- **Nada de opacidad sobre el color de marca.** La jerarquía sale del tamaño y el
+  peso. Con `opacity-75` la dirección del local daba 3.75 sobre terracota, y el chip
+  de mesa con fondo translúcido 4.06 — los dos por debajo de AA, y peor cuanto más
+  claro el color. El chip pasó a ser troquelado por eso.
+
+**La cuenta de la mesa es compartida.** Varios comensales piden desde sus propios
+móviles a la misma mesa; `GET /menu/{slug}/mesa/{qr}` devuelve las rondas de todos
+y se sondea cada 15 s con `refetchIntervalInBackground: false` — con la pantalla
+apagada no hay nadie mirando y el móvil está en una mesa sin cargador. El carrito y
+el nombre del comensal viven en `localStorage` por mesa (`useRecordado`), que
+devuelve el par de `useState` **con actualizador funcional**: sin él, dos toques
+seguidos en la carta pierden el segundo plato.
+
 ## Diseño
 
 El sistema vive en `src/index.css`, dentro de `@theme`. Hay una skill de diseño
 instalada en `.claude/skills/frontend-design`.
+
+**Cuidado con las reglas base sin capa.** `h1, h2, h3` llevan `letter-spacing` en
+`index.css` fuera de las capas de Tailwind, así que **ganan a `tracking-*`**, que sí
+está dentro de una. Un rótulo con `tracking-[0.18em]` salía en `-0.231px`. En
+titulares, el interletraje va en línea.
 
 **Tipografía en dos papeles.** El texto de interfaz usa la pila del sistema —ya
 está en el dispositivo y se pinta sin descargar nada, que en una tablet de gama

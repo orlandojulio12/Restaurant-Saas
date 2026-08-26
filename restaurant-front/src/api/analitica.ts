@@ -1,4 +1,5 @@
 import { api } from './client'
+import type { TipoPedido } from './tipos'
 
 /** Un día de la serie de ventas. */
 export type DiaVentas = {
@@ -39,7 +40,7 @@ export type Resumen = {
   from: string
   to: string
   totals: Totales
-  by_type: { type: 'dine_in' | 'delivery' | 'counter'; count: number; sales: number }[]
+  by_type: { type: TipoPedido; count: number; sales: number }[]
   by_payment_method: { method: string; count: number; amount: number }[]
 }
 

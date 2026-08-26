@@ -79,7 +79,7 @@ class OrderController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'type'                  => ['required', 'in:dine_in,delivery,counter'],
+            'type'                  => ['required', 'in:dine_in,delivery,counter,takeaway'],
             'table_id'              => ['nullable', 'integer'],
             'customer_id'           => ['nullable', 'integer'],
             'delivery_address'      => ['nullable', 'string'],
@@ -196,6 +196,12 @@ class OrderController extends Controller
             // es secuencial y cambiarlo en la URL dejaría pedir a cuenta ajena.
             'qr_code'               => ['required_without:table_id', 'nullable', 'string'],
             'table_id'              => ['required_without:qr_code', 'nullable', 'integer'],
+            // Para la mesa o para llevar. El comensal no puede abrir un
+            // domicilio ni un pedido de barra desde aquí.
+            'type'                  => ['nullable', 'in:' . implode(',', Order::TIPOS_QR)],
+            // Con varios móviles pidiendo a la misma mesa, sin esto el mesero
+            // no sabe de quién es cada plato.
+            'diner_name'            => ['nullable', 'string', 'max:60'],
             'notes'                 => ['nullable', 'string'],
             'items'                 => ['required', 'array', 'min:1'],
             'items.*.product_id'    => ['required', 'integer'],
@@ -223,9 +229,11 @@ class OrderController extends Controller
             return response()->json(['message' => 'La mesa no pertenece a este restaurante.'], 422);
         }
 
+        // La mesa se conserva incluso en lo que se llevan: es la misma cuenta
+        // y el mismo grupo de comensales, solo cambia cómo se empaca.
         $data['table_id'] = $mesa->id;
 
-        $data['type'] = 'dine_in';
+        $data['type'] = $data['type'] ?? 'dine_in';
 
         if ($error = $this->validarPedido($data, $restaurant->id)) {
             return $error;
