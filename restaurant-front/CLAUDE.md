@@ -88,6 +88,24 @@ Dos reglas de esa cabecera, las dos aprendidas midiendo:
   de mesa con fondo translúcido 4.06 — los dos por debajo de AA, y peor cuanto más
   claro el color. El chip pasó a ser troquelado por eso.
 
+**La barra de categorías señala, no filtra.** La carta se recorre entera como la
+de papel; esconder el resto le quitaría al comensal lo que vino a ojear. La
+sección activa se calcula en el propio scroll y no con `IntersectionObserver`:
+hacía falta un listener igualmente para el final de la página, y sostener dos
+mecanismos que pueden discrepar cuesta más que las cuatro lecturas de posición
+que esto hace.
+
+Dos trampas de todo scroll-spy, las dos encontradas midiendo y no mirando:
+
+- **La última sección no se alcanza nunca.** Empieza más abajo de donde el
+  scroll puede llegar —en el sembrado, en el píxel 1499 con un máximo de 1133—,
+  así que su pestaña no se marca por mucho que se baje. Va como caso aparte:
+  tocando fondo manda la última.
+- **Sin emoji por categoría**, aunque el mockup los pedía. No hay campo que los
+  guarde y adivinarlos por el nombre acierta con "Sopas" y falla con "Fritanga"
+  o "Menú del día". Mismo criterio que `FotoProducto`: aquí hay que aguantar lo
+  que escriba cada restaurante, no lo que luce en una maqueta de uno solo.
+
 **La cuenta de la mesa es compartida.** Varios comensales piden desde sus propios
 móviles a la misma mesa; `GET /menu/{slug}/mesa/{qr}` devuelve las rondas de todos
 y se sondea cada 15 s con `refetchIntervalInBackground: false` — con la pantalla
@@ -179,6 +197,13 @@ No hay tests automatizados en el frontend. Lo que sí se hace, y conviene manten
 es comprobar en el navegador midiendo: contraste resuelto con canvas (Tailwind 4
 emite `oklch` y un parseo a mano de RGB da números falsos), tamaños táctiles y
 desbordes a 375, 768 y 1440.
+
+**El panel del navegador integrado no despacha eventos de scroll ni dispara
+`IntersectionObserver`**: la página cuenta como oculta y no compone. `scrollTo`
+mueve el offset pero no avisa a nadie, y el scroll suave no avanza. Lo que
+depende del scroll se verifica simulando la regla sobre las posiciones reales de
+los elementos —así salió lo de la última sección inalcanzable—, y la parte de
+eventos hay que confirmarla a mano en un navegador de verdad.
 
 ## Pendiente
 

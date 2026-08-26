@@ -38,6 +38,15 @@ const publico = axios.create({ baseURL: '/api', headers: { Accept: 'application/
 /** Cada cuánto se vuelve a mirar lo que lleva pedido la mesa. */
 const REFRESCO_MESA = 15_000
 
+/**
+ * Lo que la barra de categorías ocupa arriba, con un respiro.
+ *
+ * Son 49 px reales —`min-h-12` más el borde inferior—, y al saltar a una
+ * sección el rótulo quedaba pegado justo debajo. Estos sirven de tope tanto
+ * para el salto como para decidir qué sección se está mirando.
+ */
+const ALTO_BARRA = 56
+
 type AdicionalPub = { id: number; name: string; extra_price: string }
 type GrupoPub = {
   id: number
@@ -137,6 +146,65 @@ function useRecordado<T>(clave: string, inicial: T): [T, React.Dispatch<React.Se
   return [valor, setValor]
 }
 
+/** El desplazamiento suave se apaga si el sistema lo pide. */
+function comportamiento(): ScrollBehavior {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+}
+
+/**
+ * Qué sección de la carta se está mirando.
+ *
+ * La barra de categorías no filtra, solo señala: la carta se recorre entera de
+ * arriba abajo como la de papel, y esconder el resto sería quitarle al comensal
+ * justo lo que vino a ojear.
+ *
+ * La regla es la última sección cuyo rótulo ya pasó por debajo de la barra. Se
+ * resuelve leyendo posiciones en el propio scroll y no con IntersectionObserver:
+ * hacía falta un listener igualmente para el final de la página, y sostener dos
+ * mecanismos que pueden discrepar cuesta más que las cuatro lecturas que esto
+ * hace. Se leen en cada scroll, sin cachear, porque las fotos de los platos
+ * llegan tarde y mueven las secciones bajo los pies.
+ */
+function useSeccionVisible(claves: string) {
+  const [activa, setActiva] = useState<number | null>(null)
+
+  useEffect(() => {
+    const ids = claves ? claves.split(',').map(Number) : []
+    if (ids.length === 0) return
+
+    const calcular = () => {
+      // Abajo del todo ya no queda recorrido para subir la última sección hasta
+      // la barra: empieza más abajo de donde el scroll puede llegar. Sin este
+      // caso aparte su pestaña no se marca nunca, por mucho que se baje.
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4) {
+        setActiva(ids[ids.length - 1])
+        return
+      }
+
+      const limite = ALTO_BARRA + 8
+      let elegida = ids[0]
+
+      for (const id of ids) {
+        const nodo = document.getElementById(`seccion-${id}`)
+        if (nodo && nodo.getBoundingClientRect().top <= limite) elegida = id
+      }
+
+      setActiva(elegida)
+    }
+
+    calcular()
+    window.addEventListener('scroll', calcular, { passive: true })
+    window.addEventListener('resize', calcular, { passive: true })
+
+    return () => {
+      window.removeEventListener('scroll', calcular)
+      window.removeEventListener('resize', calcular)
+    }
+  }, [claves])
+
+  return [activa, setActiva] as const
+}
+
 export default function MenuPublico() {
   const { slug } = useParams()
   const [params] = useSearchParams()
@@ -182,6 +250,15 @@ export default function MenuPublico() {
 
   const moneda = data?.restaurant.currency ?? 'COP'
   const rondas = mesa?.orders ?? []
+
+  // Solo las categorías con algo dentro: una pestaña que lleva a una sección
+  // vacía es una promesa incumplida.
+  const conPlatos = useMemo(
+    () => (data?.categories ?? []).filter((c) => c.products.length > 0),
+    [data],
+  )
+  const clavesSecciones = conPlatos.map((c) => c.id).join(',')
+  const [seccionActiva, setSeccionActiva] = useSeccionVisible(clavesSecciones)
 
   const enviar = useMutation({
     mutationFn: async () => {
@@ -279,12 +356,33 @@ export default function MenuPublico() {
         </div>
       )}
 
-      <main className="mx-auto max-w-2xl px-5 pb-40 pt-8">
-        {data.categories.map((categoria) => {
-          if (categoria.products.length === 0) return null
+      {conPlatos.length > 1 && (
+        <BarraCategorias
+          categorias={conPlatos}
+          activa={seccionActiva}
+          onElegir={(id) => {
+            setSeccionActiva(id)
 
+            const seccion = document.getElementById(`seccion-${id}`)
+            if (!seccion) return
+
+            window.scrollTo({
+              top: seccion.getBoundingClientRect().top + window.scrollY - ALTO_BARRA,
+              behavior: comportamiento(),
+            })
+          }}
+        />
+      )}
+
+      <main className="mx-auto max-w-2xl px-5 pb-40 pt-8">
+        {conPlatos.map((categoria) => {
           return (
-            <section key={categoria.id} className="mb-11">
+            <section
+              key={categoria.id}
+              id={`seccion-${categoria.id}`}
+              data-categoria={categoria.id}
+              className="mb-11"
+            >
               <RotuloSeccion nombre={categoria.name} platos={categoria.products.length} />
 
               <ul>
@@ -464,6 +562,80 @@ function Portada({
 }
 
 /**
+ * Las categorías, siempre a mano.
+ *
+ * Señala dónde estás; no filtra. La carta se recorre entera como la de papel, y
+ * esconder el resto sería quitarle al comensal justo lo que vino a ojear.
+ *
+ * Sin emoji por categoría, aunque quede más vistoso: no hay campo que los
+ * guarde, y adivinarlos por el nombre acierta con "Sopas" y falla con
+ * "Fritanga" o "Menú del día". Lo mismo que con las fotos de producto, aquí lo
+ * que hay que aguantar es lo que escriba cada restaurante.
+ */
+function BarraCategorias({
+  categorias,
+  activa,
+  onElegir,
+}: {
+  categorias: MenuPub['categories']
+  activa: number | null
+  onElegir: (id: number) => void
+}) {
+  const tira = useRef<HTMLDivElement>(null)
+
+  // Hasta que el observador dispare no hay sección activa, y en el primer
+  // render la carta ni siquiera ha llegado. Se deriva aquí en vez de sembrar el
+  // estado: al abrir, lo que se está mirando es la primera sección.
+  const actual = activa ?? categorias[0]?.id ?? null
+
+  // La pestaña activa se trae al centro sola. Se mueve solo la tira, nunca la
+  // página: `scrollIntoView` habría arrastrado también el scroll vertical y
+  // peleado con el salto que acaba de hacer el usuario.
+  useEffect(() => {
+    const carril = tira.current
+    const boton = carril?.querySelector<HTMLElement>('[data-activa="true"]')
+    if (!carril || !boton) return
+
+    carril.scrollTo({
+      left: Math.max(0, boton.offsetLeft - carril.clientWidth / 2 + boton.clientWidth / 2),
+      behavior: comportamiento(),
+    })
+  }, [actual])
+
+  return (
+    <nav
+      aria-label="Secciones de la carta"
+      className="sticky top-0 z-20 border-b border-piedra-200 bg-white/95 backdrop-blur"
+    >
+      <div
+        ref={tira}
+        className="mx-auto flex max-w-2xl gap-1 overflow-x-auto px-3
+                   [-ms-overflow-style:none] [scrollbar-width:none]
+                   [&::-webkit-scrollbar]:hidden"
+      >
+        {categorias.map((categoria) => {
+          const puesta = categoria.id === actual
+
+          return (
+            <button
+              key={categoria.id}
+              data-activa={puesta}
+              aria-current={puesta ? 'true' : undefined}
+              onClick={() => onElegir(categoria.id)}
+              className={`min-h-12 shrink-0 whitespace-nowrap border-b-2 px-3 text-sm font-semibold ${
+                puesta ? 'border-marca-700 text-marca-800' : 'border-transparent text-piedra-500'
+              }`}
+            >
+              {categoria.name}
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
+/**
  * El rótulo de sección de una carta impresa: nombre, filete hasta el margen y
  * el número de platos donde en el papel irían los puntos suspensivos hasta el
  * precio. El número no es decoración — dice cuánto hay que recorrer antes de
@@ -499,7 +671,7 @@ function Plato({
     <button
       onClick={onElegir}
       disabled={deshabilitado}
-      className="group flex w-full items-start gap-4 border-b border-piedra-200 py-4 text-left
+      className="flex w-full items-center gap-4 border-b border-piedra-200 py-4 text-left
                  last:border-b-0 disabled:opacity-55"
     >
       <FotoProducto
@@ -509,28 +681,32 @@ function Plato({
         className="h-[4.5rem] w-[4.5rem] shrink-0 text-xl"
       />
 
-      <div className="min-w-0 flex-1 pt-0.5">
+      {/* Nombre, descripción y precio en una sola columna: el ojo baja una vez
+          por plato en lugar de cruzar la fila para emparejar precio y nombre. */}
+      <div className="min-w-0 flex-1">
         <p className="font-semibold leading-snug text-piedra-900">{producto.name}</p>
         {producto.description && (
           <p className="mt-1 line-clamp-2 text-sm leading-snug text-piedra-500">
             {producto.description}
           </p>
         )}
+        <p className="cifras mt-1.5 font-bold text-piedra-900">
+          {dinero(producto.price, moneda)}
+        </p>
       </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
-        <span className="cifras font-bold text-piedra-900">{dinero(producto.price, moneda)}</span>
-        {!deshabilitado && (
-          <span
-            aria-hidden
-            className="flex h-8 w-8 items-center justify-center rounded-full border
-                       border-marca-300 text-lg font-bold text-marca-700
-                       group-hover:border-marca-600 group-hover:bg-marca-50"
-          >
-            +
-          </span>
-        )}
-      </div>
+      {!deshabilitado && (
+        <span
+          aria-hidden
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl font-bold"
+          style={{
+            background: 'var(--marca-pura, var(--color-marca-700))',
+            color: 'var(--tinta-marca, #ffffff)',
+          }}
+        >
+          +
+        </span>
+      )}
     </button>
   )
 }
