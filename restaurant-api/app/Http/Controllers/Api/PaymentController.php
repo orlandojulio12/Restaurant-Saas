@@ -139,6 +139,17 @@ class PaymentController extends Controller
             'amount'    => ['required', 'numeric', 'min:0'],
             'reference' => ['nullable', 'string', 'max:100'],
             'notes'     => ['nullable', 'string', 'max:255'],
+            // Cobro parcial: qué pedidos de la mesa se pagan ahora. Sin esto
+            // se cobra la mesa entera, que sigue siendo el caso normal.
+            //
+            // Va por ids y no por nombre de comensal a propósito. El reparto
+            // (`Order::repartoPorComensal`) ya le dice al cliente qué pedidos
+            // son de quién, así que al cobrar no hay que volver a casar nombres
+            // ni decidir cómo se piden "los que no pusieron nombre". Y admite
+            // agrupaciones que un nombre no expresa: Ana y Luis pagando juntos
+            // es una lista de ids, no un caso especial.
+            'order_ids'   => ['nullable', 'array', 'min:1'],
+            'order_ids.*' => ['integer'],
         ]);
 
         $abiertos = Order::with('payment')
@@ -148,20 +159,45 @@ class PaymentController extends Controller
             ->oldest()
             ->get();
 
+        $cobrables = $abiertos->filter(fn(Order $o) => !$o->payment)->values();
+
+        $parcial = !empty($data['order_ids']);
+
+        if ($parcial) {
+            $pedidos  = array_values(array_unique($data['order_ids']));
+            $elegidos = $cobrables->whereIn('id', $pedidos)->values();
+
+            // Que el id exista no basta: tiene que ser de esta mesa, seguir
+            // abierto y no estar cobrado ya. Si alguno falla no se cobra nada,
+            // porque un cobro a medias de lo que pidió Ana es peor que ninguno.
+            if ($elegidos->count() !== count($pedidos)) {
+                return response()->json([
+                    'message' => 'Alguno de esos pedidos no está pendiente de cobro en esta mesa.',
+                    'pending' => $cobrables->pluck('id')->values(),
+                ], 422);
+            }
+
+            $cobrables = $elegidos;
+        }
+
         // Una propuesta del QR no está confirmada por nadie: cobrarla sería dar
-        // por buena una comanda que el mesero todavía no ha mirado. Y dejarla
-        // fuera del cobro tampoco sirve, porque la mesa quedaría ocupada por un
-        // pedido pendiente justo después de pagar.
-        $propuestos = $abiertos->where('status', 'proposed');
+        // por buena una comanda que el mesero todavía no ha mirado.
+        //
+        // El alcance de la comprobación sigue al del cobro. Cobrando la mesa
+        // entera estorba cualquier propuesta, porque la mesa quedaría ocupada
+        // por un pedido pendiente justo después de pagar. Cobrando solo lo de
+        // Ana, que Luis tenga una propuesta sin confirmar no es asunto suyo:
+        // ahí la mesa sigue abierta a propósito.
+        $propuestos = ($parcial ? $cobrables : $abiertos)->where('status', 'proposed');
 
         if ($propuestos->isNotEmpty()) {
             return response()->json([
-                'message'  => 'La mesa tiene pedidos sin confirmar. Confírmalos o descártalos antes de cobrar.',
+                'message'  => $parcial
+                    ? 'Ese comensal tiene pedidos sin confirmar. Confírmalos o descártalos antes de cobrar.'
+                    : 'La mesa tiene pedidos sin confirmar. Confírmalos o descártalos antes de cobrar.',
                 'proposed' => $propuestos->pluck('id')->values(),
             ], 422);
         }
-
-        $cobrables = $abiertos->filter(fn(Order $o) => !$o->payment)->values();
 
         if ($cobrables->isEmpty()) {
             return response()->json(['message' => 'Esta mesa no tiene nada pendiente de cobro.'], 422);
@@ -218,6 +254,16 @@ class PaymentController extends Controller
             'change'   => $data['method'] === 'cash' ? $sobrante : 0,
             'orders'   => $cobrables->pluck('id')->values(),
             'table'    => ['id' => $table->id, 'number' => $table->number, 'status' => $table->fresh()->status],
+            // Lo que la mesa sigue debiendo. En un cobro parcial la caja tiene
+            // que saber a quién le falta pagar sin volver a preguntar.
+            'pending'  => Order::repartoPorComensal(
+                Order::where('restaurant_id', $restaurantId)
+                    ->where('table_id', $table->id)
+                    ->whereIn('status', Order::ACTIVOS)
+                    ->doesntHave('payment')
+                    ->oldest()
+                    ->get(),
+            ),
         ], 201);
     }
 }

@@ -200,6 +200,13 @@ De ahí salen tres reglas que es fácil romper:
   pedido. El dinero va en `active_total` y el conteo en `active_orders_count`:
   con el total de un solo pedido, el plano de sala decía que la mesa debía
   50.000 cuando debía el triple.
+- **El reparto no hay que calcularlo.** `Order::repartoPorComensal()` agrupa por
+  `diner_name` y suma, y lo exponen tanto el estado público de la mesa (`diners`)
+  como la respuesta del cobro (`pending`). Dos reglas que no conviene cambiar sin
+  pensarlo: se agrupa por el nombre **normalizado** pero se muestra el primero que
+  se escribió —"ana" y "Ana" son la misma persona—, y los pedidos **sin nombre van
+  a un solo grupo**, al final. Repartirlos en uno por pedido sería inventarse
+  deudores que no se sabe si existen.
 - **`POST /payments/table/{table}`** cobra todos los pedidos de la mesa a la vez.
   Sigue habiendo un `Payment` por pedido —`payments.order_id` no es nulable— pero
   se crean en una transacción, el vuelto se calcula sobre el total de la mesa y
@@ -207,6 +214,13 @@ De ahí salen tres reglas que es fácil romper:
   total de cada pedido. **Rechaza cobrar si hay propuestas sin confirmar**: sería
   dar por buena una comanda que el mesero no ha mirado, y dejarla fuera del cobro
   tampoco sirve porque la mesa quedaría ocupada justo después de pagar.
+- **El cobro parcial va por `order_ids`, no por nombre de comensal.** El reparto
+  ya dice qué pedidos son de quién, así que al cobrar no hay que volver a casar
+  nombres ni decidir cómo se piden "los que no pusieron nombre"; y admite
+  agrupaciones que un nombre no expresa —Ana y Luis pagando juntos es una lista,
+  no un caso especial. Con alcance parcial **la comprobación de propuestas se
+  reduce a los pedidos elegidos**: que Luis no haya confirmado no es asunto de
+  Ana, y ahí la mesa sigue abierta a propósito.
 
 ## Tipos de pedido
 

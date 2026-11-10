@@ -29,6 +29,56 @@ class Order extends Model
      */
     public const TIPOS_QR = ['dine_in', 'takeaway'];
 
+    /**
+     * Lo que le toca a cada comensal de una mesa.
+     *
+     * No hay que repartir nada a ojo: desde el QR **cada comensal abre su
+     * propio pedido**, así que "lo de Ana" ya está separado en la base. Esto
+     * solo agrupa por `diner_name` y suma.
+     *
+     * Dos decisiones que conviene no cambiar sin pensarlo:
+     *
+     * - Los pedidos **sin nombre van a un solo grupo**, no a uno cada uno. Si
+     *   nadie escribió cómo se llama, no se puede saber si son la misma
+     *   persona, y fingir que son tres deudores distintos sería inventarse un
+     *   dato que no existe.
+     * - Se agrupa por el nombre **normalizado** —sin espacios y en minúsculas—
+     *   pero se muestra tal y como lo escribió el primero. "ana" y "Ana" son la
+     *   misma persona sentada a la misma mesa.
+     *
+     * @param  \Illuminate\Support\Collection<int, self>  $pedidos
+     * @return array<int, array{diner_name: ?string, orders: array<int,int>, total: float}>
+     */
+    public static function repartoPorComensal($pedidos): array
+    {
+        $grupos = [];
+
+        foreach ($pedidos as $pedido) {
+            $nombre = trim((string) $pedido->diner_name);
+            $clave  = $nombre === '' ? '' : mb_strtolower($nombre);
+
+            if (!isset($grupos[$clave])) {
+                $grupos[$clave] = [
+                    'diner_name' => $nombre === '' ? null : $nombre,
+                    'orders'     => [],
+                    'total'      => 0.0,
+                ];
+            }
+
+            $grupos[$clave]['orders'][] = $pedido->id;
+            $grupos[$clave]['total']   += (float) $pedido->total;
+        }
+
+        // El grupo sin nombre va al final: es el cajón de sastre, no un
+        // comensal más, y encabezar la lista con él despista.
+        uasort($grupos, fn($a, $b) => ($a['diner_name'] === null) <=> ($b['diner_name'] === null));
+
+        return array_values(array_map(
+            fn($g) => [...$g, 'total' => round($g['total'], 2)],
+            $grupos,
+        ));
+    }
+
     protected $fillable = [
         'restaurant_id',
         'table_id',

@@ -134,6 +134,10 @@ class MenuController extends Controller
                     'additionals' => $item->additionals->pluck('additional_name'),
                 ]),
             ]),
+            // Lo que le toca a cada uno. El comensal quiere saber lo suyo, no
+            // solo el total de la mesa, y el dato ya está: cada pedido trae su
+            // `diner_name` porque cada quien pidió desde su propio móvil.
+            'diners' => Order::repartoPorComensal($pedidos),
             // Sin impuestos ni descuentos: es una referencia para el comensal,
             // no la cuenta definitiva. Esa la cierra la caja.
             'total'  => round($pedidos->sum(fn($p) => (float) $p->total), 2),

@@ -88,9 +88,17 @@ type RondaMesa = {
   created_at: string
   items: { name: string; quantity: number; subtotal: string; additionals: string[] }[]
 }
+/** Lo que le toca a un comensal. `diner_name` nulo = los pedidos sin nombre. */
+type ComensalPub = {
+  diner_name: string | null
+  orders: number[]
+  total: number
+}
+
 type EstadoMesaPub = {
   table: { id: number; number: string }
   orders: RondaMesa[]
+  diners: ComensalPub[]
   total: number
 }
 
@@ -462,6 +470,8 @@ export default function MenuPublico() {
       {hoja === 'comanda' && (
         <HojaComanda
           rondas={rondas}
+          comensales={mesa?.diners ?? []}
+          yo={nombre}
           total={mesa?.total ?? 0}
           moneda={moneda}
           mesa={data.table?.number ?? ''}
@@ -813,8 +823,122 @@ function BarraMesa({
 }
 
 /** La cuenta de la mesa, ronda por ronda. */
+/**
+ * Lo que le toca a cada uno.
+ *
+ * El dato sale solo: desde el QR cada comensal abre su propio pedido, así que
+ * "lo de Ana" ya viene separado del servidor. Aquí solo hay que decidir qué
+ * mirar primero, y eso es **lo tuyo**: quien abre esto lo hace en su móvil, con
+ * su nombre guardado, y lo que quiere saber es cuánto pone él. El resto de la
+ * mesa es contexto.
+ *
+ * El reparto a partes iguales va aparte y no sustituye al otro: son dos formas
+ * distintas de repartir y en una mesa se discuten las dos.
+ */
+function Reparto({
+  comensales,
+  yo,
+  total,
+  moneda,
+  modo,
+  onModo,
+}: {
+  comensales: ComensalPub[]
+  yo: string
+  total: number
+  moneda: string
+  modo: 'suyo' | 'iguales'
+  onModo: (v: 'suyo' | 'iguales') => void
+}) {
+  const normal = (v: string | null) => (v ?? '').trim().toLowerCase()
+  const mio = yo.trim() ? comensales.find((c) => normal(c.diner_name) === normal(yo)) : undefined
+
+  // A partes iguales se divide entre los grupos que hay. Los pedidos sin
+  // nombre cuentan como uno: no se sabe cuántas personas son, y suponerlo
+  // cambiaría la cifra que alguien va a pagar.
+  const partes = comensales.length
+  const igual = partes > 0 ? total / partes : 0
+
+  return (
+    <section className="mb-5">
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        {(
+          [
+            ['suyo', 'Cada quien lo suyo'],
+            ['iguales', 'A partes iguales'],
+          ] as ['suyo' | 'iguales', string][]
+        ).map(([valor, etiqueta]) => (
+          <button
+            key={valor}
+            type="button"
+            aria-pressed={modo === valor}
+            onClick={() => onModo(valor)}
+            className={`min-h-12 rounded-xl border px-3 text-sm font-semibold ${
+              modo === valor
+                ? 'border-marca-600 bg-marca-50 text-marca-800'
+                : 'border-piedra-300 text-piedra-600'
+            }`}
+          >
+            {etiqueta}
+          </button>
+        ))}
+      </div>
+
+      {modo === 'iguales' ? (
+        <div className="rounded-xl border border-piedra-200 bg-white p-4 text-center">
+          <p className="text-micro font-semibold uppercase text-piedra-500" style={{ letterSpacing: '0.14em' }}>
+            Cada uno, entre {partes}
+          </p>
+          <p className="cifras mt-1 text-3xl font-bold text-piedra-900">{dinero(igual, moneda)}</p>
+        </div>
+      ) : (
+        <>
+          {/* Lo tuyo primero y en grande: es la cifra que has venido a ver. */}
+          {mio && (
+            <div className="mb-2 rounded-xl border-2 border-marca-600 bg-marca-50 p-4">
+              <p className="text-micro font-semibold uppercase text-marca-800" style={{ letterSpacing: '0.14em' }}>
+                Lo tuyo
+              </p>
+              <p className="cifras mt-0.5 text-3xl font-bold text-marca-900">
+                {dinero(mio.total, moneda)}
+              </p>
+            </div>
+          )}
+
+          <ul className="overflow-hidden rounded-xl border border-piedra-200 bg-white">
+            {comensales.map((c, i) => (
+              <li
+                key={c.diner_name ?? `sin-nombre-${i}`}
+                className="flex items-baseline justify-between gap-3 border-b border-piedra-100 px-4 py-3 last:border-b-0"
+              >
+                <span className="min-w-0 truncate text-piedra-800">
+                  {c.diner_name ?? 'Sin nombre'}
+                  {c.diner_name && mio?.diner_name === c.diner_name && (
+                    <span className="ml-2 text-xs font-semibold text-marca-700">tú</span>
+                  )}
+                </span>
+                <span className="cifras shrink-0 font-bold text-piedra-900">
+                  {dinero(c.total, moneda)}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {!mio && yo.trim() === '' && (
+            <p className="mt-2 text-xs text-piedra-500">
+              Pon tu nombre al pedir y aquí verás lo tuyo aparte.
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
 function HojaComanda({
   rondas,
+  comensales,
+  yo,
   total,
   moneda,
   mesa,
@@ -822,15 +946,30 @@ function HojaComanda({
   onCerrar,
 }: {
   rondas: RondaMesa[]
+  comensales: ComensalPub[]
+  yo: string
   total: number
   moneda: string
   mesa: string
   reciente: number | null
   onCerrar: () => void
 }) {
+  const [reparto, setReparto] = useState<'suyo' | 'iguales'>('suyo')
+
   return (
     <Hoja titulo={mesa ? `Mesa ${mesa}` : 'La cuenta'} onCerrar={onCerrar} cerrar="Seguir viendo">
       <div className="flex-1 overflow-y-auto px-5 py-4">
+        {comensales.length > 1 && (
+          <Reparto
+            comensales={comensales}
+            yo={yo}
+            total={total}
+            moneda={moneda}
+            modo={reparto}
+            onModo={setReparto}
+          />
+        )}
+
         {rondas.length === 0 ? (
           <p className="py-10 text-center text-piedra-500">
             Todavía no habéis pedido nada. Lo que pida cualquiera de la mesa aparece aquí.
@@ -1240,7 +1379,12 @@ function Hoja({
     <div role="dialog" aria-modal="true" aria-label={titulo} className="fixed inset-0 z-50 flex flex-col bg-white">
       <header className="flex items-center justify-between border-b border-piedra-200 px-5 py-4">
         <h2 className="text-lg font-bold text-piedra-900">{titulo}</h2>
-        <button onClick={onCerrar} className="font-medium text-piedra-500">
+        {/* El área táctil llega a 44 px sin crecer de tamaño visual: el margen
+            negativo se come el relleno, así que la cabecera no se mueve. */}
+        <button
+          onClick={onCerrar}
+          className="-my-2 -mr-2 flex min-h-11 items-center px-2 font-medium text-piedra-500"
+        >
           {cerrar}
         </button>
       </header>

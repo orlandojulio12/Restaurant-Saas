@@ -73,8 +73,16 @@ que se le pone etiqueta — que es justo lo que debe pasar.
 que una mesa acumula varios `orders` a la vez. Cualquier pantalla que muestre "lo
 que debe la mesa" tiene que sumar sus pedidos activos (`active_total` en
 `TableResource`), no leer uno. Y cobrar va por `POST /payments/table/{table}`, que
-los cierra todos juntos. Ver *La mesa es la cuenta compartida* en el CLAUDE.md del
-backend.
+los cierra todos juntos — o solo los `order_ids` que se le pasen, que es como se
+cobra a un comensal suelto. Ver *La mesa es la cuenta compartida* en el CLAUDE.md
+del backend.
+
+**El reparto por comensal se calcula en un solo sitio.** `Order::repartoPorComensal()`
+manda, y el frontend lo replica en `Cobrar.tsx` solo porque ahí los pedidos llegan
+por otra ruta (`/tables/{id}/orders`). Si cambia la regla —cómo se normaliza el
+nombre, qué pasa con los pedidos sin nombre, en qué orden salen— hay que tocar los
+dos. Ya pasó una vez: el panel agrupaba sobre una lista en orden `latest()` y
+mostraba "luis" donde la carta mostraba "Luis".
 
 **La carta pública lleva la marca del restaurante, no la del producto.** El hex de
 `restaurants.brand_color` se convierte en la paleta entera en `lib/paleta.ts` y se
